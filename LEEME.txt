@@ -1,0 +1,44 @@
+SEMÁFORO+ · BACKEND SPRING BOOT
+================================
+
+Este proyecto ahora tiene dos partes:
+
+1) Tu interfaz original (sin modificar):
+   D:\semaforo+\index.html
+   D:\semaforo+\estilos.css
+   D:\semaforo+\app.js
+
+2) El backend + la interfaz conectada (esto es lo que se ejecuta):
+   D:\semaforo+\backend\
+
+CÓMO ARRANCAR
+-------------
+Opción fácil: doble clic en
+   D:\semaforo+\backend\iniciar.bat
+
+Opción por consola:
+   cd "D:\semaforo+\backend"
+   mvn spring-boot:run
+
+Luego abre en el navegador:
+   http://localhost:8080
+
+Usuario: superadmin
+Contraseña: 123456
+
+DÓNDE EDITAR LA WEB
+-------------------
+A partir de ahora edita los archivos de esta carpeta:
+   D:\semaforo+\backend\src\main\resources\static\
+
+El archivo NUEVO es:
+   conexion.js  -> consulta /api/estado cada segundo y pinta los datos
+                   del ESP32 (o de la simulación del servidor).
+
+DOCUMENTACIÓN COMPLETA
+----------------------
+Abre:
+   D:\semaforo+\backend\README.md
+
+Ahí están todos los endpoints, los ejemplos de prueba y el código de
+ejemplo para conectar el ESP32 cuando lo tengas.

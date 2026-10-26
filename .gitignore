@@ -1,0 +1,34 @@
+# Dependencias y archivos generados
+backend/target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Configuración local y secretos
+.env
+*.local
+application-local.yml
+
+# Base de datos local (si algún día usas H2 en archivo o MariaDB)
+datos/
+*.h2.db
+*.mv.db
+*.trace.db
+
+# Logs
+*.log
+logs/
+
+# Temporales
+*.tmp
+*.bak

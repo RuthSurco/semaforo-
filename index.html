@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Semáforo+ - Sistema inteligente de monitoreo y control de semáforos">
+    <title>Semáforo+ | Control inteligente</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<!--
+    ============================================================================
+    SEMÁFORO+ - Prototipo frontend (HTML5 + CSS3 + JavaScript puro)
+    ----------------------------------------------------------------------------
+    Todos los datos de este prototipo son SIMULADOS en el navegador.
+    No existe backend, base de datos ni hardware conectado:
+      - El "sensor" de distancia es un contador en JavaScript.
+      - La cámara es un esquema dibujado con CSS (no usa getUserMedia).
+      - El mapa es un dibujo con CSS (no usa Google Maps ni ninguna API).
+      - Los usuarios viven en memoria y la configuración en localStorage.
+    En una versión real la conexión se haría con Django + MariaDB + ESP32.
+    ============================================================================
+-->
+
+<!-- ===================== INICIO DE SESIÓN ===================== -->
+<div class="pantalla-login" id="pantalla-login">
+    <main class="tarjeta-login">
+        <header class="login-encabezado">
+            <p class="login-marca">Semáforo<span class="mas">+</span></p>
+            <h1 class="login-titulo">Sistema inteligente de monitoreo y control de semáforos</h1>
+            <p class="login-subtitulo">Control inteligente · Plataforma privada para superadministradores y administradores autorizados</p>
+        </header>
+
+        <form class="formulario-login" id="formulario-login" novalidate>
+            <label class="campo">
+                <span class="campo-etiqueta">Usuario</span>
+                <input type="text" id="campo-usuario" placeholder="superadmin" autocomplete="username" spellcheck="false">
+            </label>
+
+            <label class="campo">
+                <span class="campo-etiqueta">Contraseña</span>
+                <span class="campo-controles">
+                    <input type="password" id="campo-contrasena" placeholder="123456" autocomplete="current-password">
+                    <button type="button" class="ver-contrasena" id="ver-contrasena" title="Mostrar contraseña">ver</button>
+                </span>
+            </label>
+
+            <p class="login-error" id="mensaje-login" role="alert"></p>
+
+            <button type="submit" class="boton boton-primario boton-ancho boton-cargando" id="boton-login">
+                <span class="boton-texto">Iniciar sesión</span>
+                <span class="cargador" aria-hidden="true"></span>
+            </button>
+
+            <p class="login-pie">Prototipo académico — autenticación simulada</p>
+        </form>
+    </main>
+</div>
+
+
+<!-- ===================== APLICACIÓN ===================== -->
+<div class="aplicacion" id="aplicacion" hidden>
+
+    <!-- ---------- CABECERA ---------- -->
+    <header class="cabecera">
+        <div class="cabecera-marca">
+            <span class="marca-nombre">Semáforo<span class="mas">+</span></span>
+            <span class="marca-subtitulo">Control inteligente</span>
+        </div>
+
+        <div class="cabecera-datos">
+            <span class="chip chip-simulacion" id="chip-simulacion">
+                <span class="punto-punto verde"></span> Simulación activa
+            </span>
+
+            <div class="reloj" id="reloj">
+                <span class="reloj-hora" id="fecha-hora">--:--:--</span>
+                <span class="reloj-fecha" id="fecha-actual">—</span>
+            </div>
+
+            <div class="notificaciones">
+                <button type="button" class="boton boton-plano" id="boton-notificaciones">Notificaciones</button>
+                <span class="contador-notificaciones" id="contador-notificaciones" hidden>0</span>
+                <div class="panel-notificaciones" id="panel-notificaciones" hidden>
+                    <div class="panel-notificaciones-cabecera">
+                        <strong>Notificaciones</strong>
+                        <button type="button" class="enlace" id="limpiar-notificaciones">Limpiar</button>
+                    </div>
+                    <ul class="lista-notificaciones" id="lista-notificaciones">
+                        <li class="vacio">Sin notificaciones nuevas.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="cabecera-usuario">
+                <span class="avatar avatar-barra" id="avatar-barra">SU</span>
+                <span class="cabecera-usuario-datos">
+                    <span class="cabecera-usuario-nombre" id="nombre-usuario-barra">—</span>
+                    <span class="cabecera-usuario-rol" id="rol-usuario-barra">—</span>
+                </span>
+            </div>
+
+            <button type="button" class="boton boton-peligro" id="cerrar-sesion">Cerrar sesión</button>
+        </div>
+    </header>
+
+    <!-- ---------- BARRA DE NAVEGACIÓN ---------- -->
+    <nav class="barra-navegacion" id="menu-lateral" aria-label="Secciones del sistema">
+        <div class="barra-navegacion-interior">
+            <button type="button" class="nav-item activo" data-seccion="dashboard" id="nav-dashboard">Dashboard</button>
+            <button type="button" class="nav-item" data-seccion="semaforos" id="nav-semaforos">Semáforos</button>
+            <button type="button" class="nav-item" data-seccion="camaras" id="nav-camaras">Cámaras</button>
+            <button type="button" class="nav-item" data-seccion="mapa" id="nav-mapa">Mapa y rutas</button>
+            <button type="button" class="nav-item" data-seccion="estadisticas" id="nav-estadisticas">Estadísticas</button>
+            <button type="button" class="nav-item nav-restringido" data-seccion="usuarios" id="nav-usuarios" hidden>Gestión de usuarios</button>
+            <button type="button" class="nav-item nav-restringido" data-seccion="configuracion" id="nav-configuracion" hidden>Configuración</button>
+        </div>
+        <button type="button" class="boton boton-plano boton-menu-movil" id="boton-menu-movil" aria-label="Mostrar secciones">Menú</button>
+    </nav>
+
+    <!-- ---------- CONTENIDO ---------- -->
+    <div class="zona-principal">
+        <main class="contenido" id="contenido">
+
+            <div class="pagina-encabezado">
+                <h1 class="pagina-titulo" id="titulo-seccion">Dashboard</h1>
+                <p class="pagina-descripcion" id="descripcion-seccion">Monitoreo general del sistema de semáforos inteligentes</p>
+            </div>
+
+            <!-- ===================== DASHBOARD ===================== -->
+            <section class="seccion activa" id="seccion-dashboard">
+                <div class="rejilla-dos">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera"><h2>Resumen del sistema</h2></header>
+                        <dl class="lista-datos">
+                            <div><dt>Semáforos activos</dt><dd id="valor-semaforos">1</dd></div>
+                            <div><dt>Vehículos detectados</dt><dd id="valor-vehiculos">24</dd></div>
+                            <div><dt>Cámaras conectadas</dt><dd id="valor-camaras">1</dd></div>
+                            <div><dt>Alertas activas</dt><dd><span id="valor-alertas">0</span> <span class="insignia insignia-exito" id="insignia-alertas">Sin alertas</span></dd></div>
+                        </dl>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Estado general</h2>
+                            <span class="insignia insignia-exito" id="estado-general">Operativo</span>
+                        </header>
+                        <dl class="lista-datos">
+                            <div><dt>Dispositivo</dt><dd id="estado-dispositivo">Semáforo Principal</dd></div>
+                            <div><dt>Conexión</dt><dd id="estado-conexion">Simulación activa</dd></div>
+                            <div><dt>Modo de control</dt><dd id="estado-modo">Automático</dd></div>
+                            <div><dt>Última actualización</dt><dd id="estado-actualizacion">—</dd></div>
+                        </dl>
+                    </article>
+                </div>
+
+                <div class="rejilla-dos">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Resumen del semáforo</h2>
+                            <span class="insignia insignia-info" id="dash-estado-luz">Rojo</span>
+                        </header>
+                        <div class="resumen-semaforo">
+                            <div class="mini-semaforo" id="mini-semaforo" title="Semáforo Principal">
+                                <span class="mini-luz mini-r activa" data-color="rojo"></span>
+                                <span class="mini-luz mini-a" data-color="amarillo"></span>
+                                <span class="mini-luz mini-v" data-color="verde"></span>
+                            </div>
+                            <dl class="lista-datos">
+                                <div><dt>Color actual</dt><dd id="dash-color">Rojo</dd></div>
+                                <div><dt>Distancia</dt><dd id="dash-distancia">120 cm</dd></div>
+                                <div><dt>Vehículo detectado</dt><dd id="dash-vehiculo">No</dd></div>
+                                <div><dt>Modo</dt><dd id="dash-modo">Automático</dd></div>
+                                <div><dt>Última lectura</dt><dd id="dash-lectura">—</dd></div>
+                            </dl>
+                        </div>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Actividad reciente</h2>
+                            <span class="tarjeta-pie" id="contador-actividad">0 eventos</span>
+                        </header>
+                        <ul class="lista-actividad" id="lista-actividad"></ul>
+                    </article>
+                </div>
+
+                <article class="tarjeta">
+                    <header class="tarjeta-cabecera">
+                        <h2>Estado de conexión</h2>
+                        <span class="insignia insignia-exito">En línea</span>
+                    </header>
+                    <ul class="lista-conexion">
+                        <li><span class="punto-punto verde"></span> ESP32 simulado <small>conectado</small></li>
+                        <li><span class="punto-punto verde"></span> Sensor HC-SR04 <small>conectado</small></li>
+                        <li><span class="punto-punto verde"></span> Cámara simulada <small>transmitiendo</small></li>
+                        <li><span class="punto-punto verde"></span> Enlace local <small>estable</small></li>
+                    </ul>
+                </article>
+            </section>
+
+            <!-- ===================== SEMÁFOROS ===================== -->
+            <section class="seccion" id="seccion-semaforos" hidden>
+                <div class="selector-linea">
+                    <label for="selector-semaforo">Dispositivo</label>
+                    <select id="selector-semaforo">
+                        <option value="principal">Semáforo Principal — Avenida Central</option>
+                    </select>
+                </div>
+
+                <article class="tarjeta">
+                    <header class="tarjeta-cabecera">
+                        <h2>Semáforo Principal</h2>
+                        <span class="insignia insignia-exito">Operativo</span>
+                    </header>
+
+                    <div class="rejilla-semaforo">
+                        <div class="semaforo-caja">
+                            <div class="semaforo" id="semaforo-visual">
+                                <span class="semaforo-luz luz-semaforo-roja activa" data-color="rojo" id="luz-roja"></span>
+                                <span class="semaforo-luz luz-semaforo-amarilla" data-color="amarillo" id="luz-amarilla"></span>
+                                <span class="semaforo-luz luz-semaforo-verde" data-color="verde" id="luz-verde"></span>
+                                <span class="semaforo-poste"></span>
+                            </div>
+                            <p class="estado-actual" id="estado-actual">Estado actual: <strong>Rojo</strong></p>
+                        </div>
+
+                        <dl class="lista-datos">
+                            <div><dt>Nombre</dt><dd id="info-nombre">Semáforo Principal</dd></div>
+                            <div><dt>Ubicación</dt><dd id="info-ubicacion">Avenida Central</dd></div>
+                            <div><dt>Dispositivo</dt><dd id="info-dispositivo">ESP32 simulado</dd></div>
+                            <div><dt>Estado</dt><dd id="info-estado">Operativo</dd></div>
+                            <div><dt>Conexión</dt><dd id="info-conexion">Conectado</dd></div>
+                        </dl>
+                    </div>
+
+                    <h3 class="subtitulo-panel">Datos del sensor</h3>
+                    <dl class="lista-datos lista-datos-cuatro">
+                        <div><dt>Distancia actual</dt><dd id="sensor-distancia">120 cm</dd></div>
+                        <div><dt>Vehículo detectado</dt><dd id="sensor-vehiculo">No</dd></div>
+                        <div><dt>Última lectura</dt><dd id="sensor-lectura">—</dd></div>
+                        <div><dt>Conexión</dt><dd id="sensor-conexion">Conectado</dd></div>
+                    </dl>
+                </article>
+
+                <div class="rejilla-dos">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Modos de operación</h2>
+                            <span class="insignia insignia-info" id="insignia-modo">Automático</span>
+                        </header>
+                        <div class="grupo-botones">
+                            <button type="button" class="boton boton-primario activo" id="btn-modo-automatico">Modo automático</button>
+                            <button type="button" class="boton" id="btn-modo-manual">Modo manual</button>
+                        </div>
+                        <p class="texto-ayuda" id="info-modo-ayuda">El sistema controla el semáforo automáticamente.</p>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Control manual</h2>
+                            <span class="tarjeta-pie">Solo disponible en modo manual</span>
+                        </header>
+                        <div class="grupo-botones grupo-tres">
+                            <button type="button" class="boton boton-rojo btn-manual" id="btn-rojo">Cambiar a rojo</button>
+                            <button type="button" class="boton boton-amarillo btn-manual" id="btn-amarillo">Cambiar a amarillo</button>
+                            <button type="button" class="boton boton-verde btn-manual" id="btn-verde">Cambiar a verde</button>
+                        </div>
+                        <p class="texto-ayuda texto-suave">Los botones se bloquean mientras el modo automático esté activo.</p>
+                    </article>
+                </div>
+
+                <article class="tarjeta">
+                    <header class="tarjeta-cabecera">
+                        <h2>Simulación del sensor</h2>
+                        <span class="tarjeta-pie">Sensores simulados en JavaScript · sin hardware</span>
+                    </header>
+                    <div class="grupo-botones grupo-cuatro">
+                        <button type="button" class="boton boton-primario-suave" id="btn-acercando">Simular vehículo acercándose</button>
+                        <button type="button" class="boton boton-primario-suave" id="btn-alejandose">Simular vehículo alejándose</button>
+                        <button type="button" class="boton" id="btn-via-libre">Simular vía libre</button>
+                        <button type="button" class="boton" id="btn-restablecer">Restablecer simulación</button>
+                    </div>
+                </article>
+            </section>
+
+            <!-- ===================== CÁMARAS ===================== -->
+            <section class="seccion" id="seccion-camaras" hidden>
+                <article class="tarjeta">
+                    <header class="tarjeta-cabecera">
+                        <div>
+                            <h2 id="camara-nombre">Cámara Semáforo Principal</h2>
+                            <p class="tarjeta-pie" id="camara-ubicacion">Avenida Central</p>
+                        </div>
+                        <div class="grupo-inline">
+                            <span class="insignia insignia-error" id="camara-simu">SIMULACIÓN</span>
+                            <span class="insignia insignia-info">LIVE</span>
+                            <span class="insignia insignia-info" id="camara-estado">Conectada — Simulación</span>
+                        </div>
+                    </header>
+
+                    <!-- Esquema de la escena (sin cámara real) -->
+                    <div class="escena" id="escena-camara">
+                        <div class="escena-edificios">
+                            <span class="edificio e1"></span><span class="edificio e2"></span>
+                            <span class="edificio e3"></span><span class="edificio e4"></span>
+                            <span class="edificio e5"></span>
+                        </div>
+                        <div class="escena-calzada">
+                            <span class="linea-borde lb1"></span>
+                            <span class="linea-trafico l1"></span>
+                            <span class="linea-borde lb2"></span>
+                            <span class="linea-trafico l2"></span>
+                            <span class="linea-borde lb3"></span>
+                            <span class="linea-trafico l3"></span>
+                        </div>
+                        <span class="farola f1"><i class="farola-cabeza"></i><i class="farola-poste"></i></span>
+                        <span class="farola f2"><i class="farola-cabeza"></i><i class="farola-poste"></i></span>
+                        <span class="semaforo-calle" id="semaforo-calle">
+                            <i class="luz-calle lc-r activa"></i><i class="luz-calle lc-a"></i><i class="luz-calle lc-v"></i>
+                            <i class="poste-calle"></i>
+                        </span>
+                        <span class="vehiculo-camara vc1"><i class="ventana"></i></span>
+                        <span class="vehiculo-camara vc2"><i class="ventana"></i></span>
+                        <span class="vehiculo-camara vc3"><i class="ventana"></i></span>
+                        <span class="vehiculo-camara vc4"><i class="ventana"></i></span>
+                        <span class="vehiculo-camara vc5"><i class="ventana"></i></span>
+                        <div class="escena-hud">
+                            <span>CAM-01 · Avenida Central</span>
+                            <span id="vehiculos-en-vista">0 vehículos en vista</span>
+                        </div>
+                        <div class="escena-captura" id="flash-captura"></div>
+                    </div>
+
+                    <div class="grupo-botones grupo-tres">
+                        <button type="button" class="boton boton-primario" id="btn-capturar">Capturar imagen</button>
+                        <button type="button" class="boton" id="btn-pantalla-completa">Pantalla completa</button>
+                        <button type="button" class="boton" id="btn-sonido">Activar sonido</button>
+                    </div>
+                    <p class="texto-ayuda texto-suave" id="estado-sonido">Sonido desactivado (simulación, no se reproduce audio real).</p>
+                </article>
+            </section>
+
+            <!-- ===================== MAPA Y RUTAS ===================== -->
+            <!--
+                NOTA ARQUITECTÓNICA:
+                Este mapa es un DIBUJO CON CSS, no un servicio real.
+                En una versión futura puede reemplazarse por:
+                  - Google Maps (JavaScript API + API key),
+                  - OpenStreetMap,
+                  - Leaflet + OpenStreetMap,
+                o por un endpoint propio en Django que devuelva JSON de
+                posiciones. Ninguna de esas opciones es obligatoria aquí para
+                que el prototipo funcione sin internet y sin claves de API.
+            -->
+            <section class="seccion" id="seccion-mapa" hidden>
+                <div class="rejilla-mapa">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Plano de la intersección</h2>
+                            <span class="tarjeta-pie">Esquema simulado</span>
+                        </header>
+                        <div class="mapa" id="mapa">
+                            <div class="mapa-rejilla">
+                                <span class="manzana"></span><span class="manzana"></span><span class="manzana"></span>
+                                <span class="manzana"></span><span class="manzana zona-verde"></span><span class="manzana"></span>
+                                <span class="manzana"></span><span class="manzana"></span><span class="manzana"></span>
+                            </div>
+                            <span class="ruta ruta-h"></span>
+                            <span class="ruta ruta-v"></span>
+                            <span class="marcador marcador-principal" title="Semáforo Principal">
+                                <i></i><b>Semáforo Principal</b>
+                            </span>
+                            <span class="marcador marcador-verde m-a" title="Sensor 1"></span>
+                            <span class="marcador marcador-amarillo m-b" title="Sensor 2"></span>
+                            <span class="marcador marcador-rojo m-c" title="Cámara"></span>
+                            <span class="marcador marcador-gris m-d" title="Sensor desconectado"></span>
+                            <div class="mapa-norte">N</div>
+                        </div>
+                        <div class="leyenda">
+                            <span class="leyenda-item"><i class="punto-punto verde"></i> Tráfico normal</span>
+                            <span class="leyenda-item"><i class="punto-punto amarillo"></i> Tráfico moderado</span>
+                            <span class="leyenda-item"><i class="punto-punto rojo"></i> Tráfico intenso</span>
+                            <span class="leyenda-item"><i class="punto-punto gris"></i> Dispositivo desconectado</span>
+                        </div>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Información del punto</h2>
+                            <span class="insignia insignia-alerta">Tráfico moderado</span>
+                        </header>
+                        <dl class="lista-datos">
+                            <div><dt>Ubicación</dt><dd id="mapa-ubicacion">Avenida Central</dd></div>
+                            <div><dt>Semáforo</dt><dd id="mapa-semaforo">Semáforo Principal</dd></div>
+                            <div><dt>Estado</dt><dd id="mapa-estado">Operativo</dd></div>
+                            <div><dt>Nivel de tráfico</dt><dd id="mapa-trafico">Moderado</dd></div>
+                            <div><dt>Vehículos detectados</dt><dd id="mapa-vehiculos">24</dd></div>
+                            <div><dt>Última actualización</dt><dd id="mapa-actualizacion">—</dd></div>
+                        </dl>
+                        <p class="texto-ayuda texto-suave">
+                            La ruta azul representa el flujo monitoreado del prototipo.
+                            En una versión real la ruta se calcularía con un motor de rutas
+                            (Django + datos de tráfico) y se dibujaría sobre el mapa.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ===================== ESTADÍSTICAS ===================== -->
+            <section class="seccion" id="seccion-estadisticas" hidden>
+                <div class="selector-linea">
+                    <label for="selector-periodo">Periodo</label>
+                    <select id="selector-periodo">
+                        <option value="hoy">Hoy</option>
+                        <option value="semana">Esta semana</option>
+                        <option value="mes">Este mes</option>
+                    </select>
+                </div>
+
+                <article class="tarjeta">
+                    <header class="tarjeta-cabecera">
+                        <h2>Indicadores del periodo</h2>
+                        <span class="tarjeta-pie" id="stat-vehiculos-pie">Datos simulados</span>
+                    </header>
+                    <dl class="lista-datos lista-datos-cuatro">
+                        <div><dt>Total de vehículos detectados</dt><dd id="stat-vehiculos">24</dd></div>
+                        <div><dt>Tiempo promedio de espera</dt><dd id="stat-espera">14 s</dd></div>
+                        <div><dt>Cambios de estado</dt><dd id="stat-cambios">6</dd></div>
+                        <div><dt>Hora de mayor tráfico</dt><dd id="stat-hora-pico">18:00</dd></div>
+                    </dl>
+                </article>
+
+                <div class="rejilla-dos">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Vehículos detectados por hora</h2>
+                            <span class="tarjeta-pie">Simulación</span>
+                        </header>
+                        <div class="grafico-barras" id="grafico-vehiculos"></div>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Actividad semanal</h2>
+                            <span class="tarjeta-pie">Simulación</span>
+                        </header>
+                        <div class="grafico-barras" id="grafico-semanal"></div>
+                    </article>
+                </div>
+
+                <div class="rejilla-dos">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Porcentaje de tiempo por color</h2>
+                            <span class="tarjeta-pie">Simulación</span>
+                        </header>
+                        <div class="grafico-donut">
+                            <div class="donut" id="grafico-tiempos">
+                                <div class="donut-centro">
+                                    <strong id="donut-total">100%</strong>
+                                    <span>del ciclo</span>
+                                </div>
+                            </div>
+                            <ul class="leyenda-donut">
+                                <li><i class="punto-punto rojo"></i> Rojo <strong id="donut-rojo">46%</strong></li>
+                                <li><i class="punto-punto amarillo"></i> Amarillo <strong id="donut-amarillo">12%</strong></li>
+                                <li><i class="punto-punto verde"></i> Verde <strong id="donut-verde">42%</strong></li>
+                            </ul>
+                        </div>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera">
+                            <h2>Nivel de tráfico por zona</h2>
+                            <span class="tarjeta-pie">Simulación</span>
+                        </header>
+                        <ul class="barras-horizontal" id="grafico-trafico"></ul>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ===================== GESTIÓN DE USUARIOS (solo superadmin) ===================== -->
+            <section class="seccion" id="seccion-usuarios" hidden>
+                <article class="tarjeta">
+                    <header class="tarjeta-cabecera">
+                        <div>
+                            <h2>Usuarios registrados</h2>
+                            <p class="tarjeta-pie" id="total-usuarios">2 usuarios</p>
+                        </div>
+                        <button type="button" class="boton boton-primario" id="btn-nuevo-usuario">+ Nuevo usuario</button>
+                    </header>
+
+                    <div class="tabla-envoltura">
+                        <table class="tabla">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                    <th>Último acceso</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-usuarios"></tbody>
+                        </table>
+                    </div>
+
+                    <p class="texto-ayuda texto-suave">
+                        Los cambios se mantienen solo en memoria durante la sesión del prototipo.
+                        En una versión real se guardarían en MariaDB mediante Django.
+                    </p>
+                </article>
+            </section>
+
+            <!-- ===================== CONFIGURACIÓN (solo superadmin) ===================== -->
+            <section class="seccion" id="seccion-configuracion" hidden>
+                <div class="rejilla-tres">
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera"><h2>Configuración general</h2></header>
+                        <div class="grupo-campos">
+                            <label class="campo">
+                                <span class="campo-etiqueta">Nombre del sistema</span>
+                                <input type="text" id="config-nombre-sistema" value="Semáforo+">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Ubicación principal</span>
+                                <input type="text" id="config-ubicacion" value="Avenida Central">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Estado del sistema</span>
+                                <select id="config-estado">
+                                    <option value="operativo">Operativo</option>
+                                    <option value="mantenimiento">Mantenimiento</option>
+                                    <option value="pausado">Pausado</option>
+                                </select>
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Intervalo de actualización (ms)</span>
+                                <input type="number" id="config-intervalo" min="200" step="100" value="1000">
+                            </label>
+                        </div>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera"><h2>Configuración del semáforo</h2></header>
+                        <div class="grupo-campos">
+                            <label class="campo">
+                                <span class="campo-etiqueta">Distancia mínima de detección (cm)</span>
+                                <input type="number" id="config-distancia-min" min="5" step="1" value="30">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Distancia máxima (cm)</span>
+                                <input type="number" id="config-distancia-max" min="50" step="1" value="120">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Tiempo mínimo en verde (s)</span>
+                                <input type="number" id="config-tiempo-verde" min="1" step="1" value="8">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Tiempo mínimo en rojo (s)</span>
+                                <input type="number" id="config-tiempo-rojo" min="1" step="1" value="8">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Modo predeterminado</span>
+                                <select id="config-modo">
+                                    <option value="automatico">Automático</option>
+                                    <option value="manual">Manual</option>
+                                </select>
+                            </label>
+                        </div>
+                    </article>
+
+                    <article class="tarjeta">
+                        <header class="tarjeta-cabecera"><h2>Configuración de cámara</h2></header>
+                        <div class="grupo-campos">
+                            <label class="campo">
+                                <span class="campo-etiqueta">Nombre de cámara</span>
+                                <input type="text" id="config-camara-nombre" value="Cámara Semáforo Principal">
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Estado</span>
+                                <select id="config-camara-estado">
+                                    <option value="activada">Activada</option>
+                                    <option value="desactivada">Desactivada</option>
+                                </select>
+                            </label>
+                            <label class="campo">
+                                <span class="campo-etiqueta">Calidad simulada</span>
+                                <select id="config-camara-calidad">
+                                    <option value="1080p">1080p (simulada)</option>
+                                    <option value="720p">720p (simulada)</option>
+                                    <option value="480p">480p (simulada)</option>
+                                </select>
+                            </label>
+                            <div class="vista-previa" id="vista-previa-config">1080p · 1920×1080</div>
+                        </div>
+                    </article>
+                </div>
+
+                <article class="tarjeta">
+                    <div class="grupo-botones">
+                        <button type="button" class="boton boton-primario" id="btn-guardar-config">Guardar cambios</button>
+                        <button type="button" class="boton" id="btn-restablecer-config">Restablecer configuración</button>
+                    </div>
+                </article>
+            </section>
+
+            <!-- ---------- PIE DE PÁGINA ---------- -->
+            <footer class="pie-pagina">
+                <span>Usuario conectado:
+                    <span class="avatar avatar-menu" id="avatar-menu">SU</span>
+                    <strong id="nombre-usuario-menu">—</strong>
+                </span>
+                <span class="pie-rol" id="rol-usuario-menu">—</span>
+                <span class="pie-nota">Prototipo académico · datos simulados en el navegador</span>
+            </footer>
+        </main>
+    </div>
+</div>
+
+
+<!-- ===================== MODAL DE USUARIO ===================== -->
+<div class="modal" id="modal-usuario" hidden>
+    <div class="modal-fondo" data-cerrar-modal></div>
+    <div class="modal-caja" role="dialog" aria-modal="true" aria-labelledby="modal-usuario-titulo">
+        <header class="modal-cabecera">
+            <h2 id="modal-usuario-titulo">Nuevo usuario</h2>
+            <button type="button" class="boton boton-plano" id="btn-cerrar-modal">Cerrar</button>
+        </header>
+        <form class="modal-cuerpo grupo-campos" id="formulario-usuario">
+            <input type="hidden" id="usuario-id">
+            <label class="campo">
+                <span class="campo-etiqueta">Nombre</span>
+                <input type="text" id="usuario-nombre" placeholder="Nombre completo">
+            </label>
+            <label class="campo">
+                <span class="campo-etiqueta">Usuario</span>
+                <input type="text" id="usuario-username" placeholder="usuario" spellcheck="false">
+            </label>
+            <label class="campo">
+                <span class="campo-etiqueta">Rol</span>
+                <select id="usuario-rol">
+                    <option value="Administrador">Administrador</option>
+                    <option value="Superadministrador">Superadministrador</option>
+                </select>
+            </label>
+            <label class="campo">
+                <span class="campo-etiqueta">Estado</span>
+                <select id="usuario-estado">
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                </select>
+            </label>
+            <p class="modal-error" id="modal-error"></p>
+        </form>
+        <footer class="modal-pie">
+            <button type="button" class="boton" id="btn-cancelar-usuario">Cancelar</button>
+            <button type="button" class="boton boton-primario" id="btn-guardar-usuario">Guardar usuario</button>
+        </footer>
+    </div>
+</div>
+
+<!-- ===================== NOTIFICACIONES ===================== -->
+<div class="zona-notificaciones" id="zona-notificaciones" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

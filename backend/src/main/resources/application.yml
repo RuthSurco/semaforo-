@@ -1,0 +1,56 @@
+server:
+  port: 8080
+  # 0.0.0.0 permite que el ESP32 (en la misma red WiFi) alcance el servidor.
+  address: 0.0.0.0
+
+spring:
+  application:
+    name: semaforo-plus
+
+  datasource:
+    url: jdbc:h2:mem:semaforoplus;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: false
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+# =====================================================================
+# Configuración propia del sistema
+# =====================================================================
+semaforo:
+  dispositivo:
+    nombre: Semáforo Principal
+    ubicacion: Avenida Central
+
+  # Cuando no hay un ESP32 enviando datos, el backend genera lecturas
+  # simuladas para que la web y las estadísticas sigan funcionando.
+  simulador:
+    activo: true
+    intervalo-ms: 2000
+    # Tiempo sin telemetría real tras el cual se considera al ESP32
+    # desconectado y el simulador vuelve a tomar el control.
+    silencio-real-ms: 10000
+
+  # Retención del historial en memoria H2.
+  historial:
+    max-registros: 20000
+
+logging:
+  level:
+    com.semaforoplus: INFO
