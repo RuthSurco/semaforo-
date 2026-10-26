@@ -151,9 +151,10 @@ spring:
 | `esperaPromedioSegundos` | Desde cada detección hasta la siguiente lectura en verde (máx. 60 s) |
 | `trafico` | Nivel por zona derivado del volumen del periodo |
 
-Si todavía no hay historial, `conexion.js` detecta `totalVehiculos = 0` y
-mantiene los datos base del prototipo, para que la pantalla no se vea vacía en
-el primer arranque.
+Si todavía no hay historial suficiente (menos de 10 lecturas), `conexion.js`
+mantiene los datos base del prototipo para que la pantalla no se vea vacía en el
+primer arranque. En cuanto hay historial, la etiqueta cambia a
+**Historial real · hoy**.
 
 ---
 

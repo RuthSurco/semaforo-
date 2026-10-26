@@ -20,6 +20,7 @@
         disponible: false,
         esp32: false,
         origen: null,
+        totalLecturas: 0,
         avisoMostrado: false
     };
 
@@ -73,6 +74,8 @@
                 ? 'telemetría real del ESP32'
                 : 'simulación generada por el servidor');
         }
+
+        conexion.totalLecturas = Number(dto.totalLecturas) || 0;
     }
 
     function marcarSinServidor() {
@@ -231,8 +234,10 @@
 
     function pintarEstadisticas(datos) {
         if (!datos) { return false; }
-        if (datos.totalVehiculos === 0 && datos.cambios === 0) {
-            return false; /* Sin historial todavía: se muestran los datos base. */
+        /* Con muy poco historial (recién arrancado) se muestran los datos base
+           del prototipo para que la pantalla no aparezca vacía. */
+        if (conexion.totalLecturas < 10) {
+            return false;
         }
 
         texto('stat-vehiculos', datos.totalVehiculos);

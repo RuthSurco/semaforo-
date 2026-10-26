@@ -57,6 +57,7 @@ public class SemaforoService {
     private Instant ultimaTelemetriaReal = Instant.EPOCH;
     private long totalLecturas = 0;
     private boolean camaraConectada = true;
+    private int pasosSinDeteccion = 0;
 
     public SemaforoService(
             LecturaRepository lecturas,
@@ -209,12 +210,22 @@ public class SemaforoService {
                 return;
             }
 
-            int delta = aleatorio.nextInt(41) - 20;
+            int delta;
+            if (!vehiculoDetectado && pasosSinDeteccion >= 6) {
+                /* Tras unos segundos de vía libre, un vehículo se acerca:
+                   así la demo muestra actividad rápidamente. */
+                delta = -(6 + aleatorio.nextInt(10));
+            } else {
+                delta = aleatorio.nextInt(41) - 20;
+            }
             distanciaCm = Math.max(15, Math.min(160, distanciaCm + delta));
 
             boolean detectado = vehiculoDetectado ? distanciaCm < 60 : distanciaCm < 38;
             if (detectado && !vehiculoDetectado) {
                 vehiculosDetectados++;
+                pasosSinDeteccion = 0;
+            } else if (!detectado) {
+                pasosSinDeteccion++;
             }
             vehiculoDetectado = detectado;
 
