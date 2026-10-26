@@ -2,6 +2,13 @@ server:
   port: 8080
   # 0.0.0.0 permite que el ESP32 (en la misma red WiFi) alcance el servidor.
   address: 0.0.0.0
+  servlet:
+    session:
+      # La sesión se cierra sola tras 8 horas sin actividad.
+      timeout: 8h
+      cookie:
+        http-only: true
+        same-site: lax
 
 spring:
   application:
@@ -34,6 +41,12 @@ spring:
 # Configuración propia del sistema
 # =====================================================================
 semaforo:
+  # Login real con Spring Security.
+  seguridad:
+    # Contraseña de las cuentas iniciales superadmin y admin.
+    # Cámbiala aquí antes de publicar el proyecto.
+    clave-inicial: "123456"
+
   dispositivo:
     nombre: Semáforo Principal
     ubicacion: Avenida Central

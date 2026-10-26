@@ -24,6 +24,12 @@
         avisoMostrado: false
     };
 
+    /* El sondeo solo funciona con sesión iniciada. */
+    var activo = false;
+    var temporizador = null;
+    var generacion = 0;
+    var peticionEnCurso = null;
+
     var porId = function (id) { return document.getElementById(id); };
 
     function texto(id, valor) {
@@ -172,22 +178,48 @@
     }
 
     function consultarEstado() {
-        fetch(CONFIG.base + '/api/estado', { cache: 'no-store' })
+        if (!activo) { return; }
+
+        /* Cada sesión tiene su propia "generación": si se cierra sesión mientras
+           hay una petición en vuelo, su respuesta se ignora. */
+        var genActual = generacion;
+        peticionEnCurso = new AbortController();
+
+        fetch(CONFIG.base + '/api/estado', {
+            cache: 'no-store',
+            signal: peticionEnCurso.signal
+        })
             .then(function (respuesta) {
+                if (genActual !== generacion) { return null; }
+                if (respuesta.status === 401) {
+                    /* La sesión caducó: se deja de consultar y se pide login. */
+                    detenerPolling();
+                    if (typeof mostrarNotificacion === 'function') {
+                        mostrarNotificacion('Tu sesión caducó. Inicia sesión de nuevo.', 'advertencia');
+                    }
+                    if (typeof mostrarPantallaLogin === 'function') {
+                        mostrarPantallaLogin();
+                    }
+                    return null;
+                }
                 if (!respuesta.ok) { throw new Error('HTTP ' + respuesta.status); }
                 return respuesta.json();
             })
             .then(function (dto) {
+                if (!dto || genActual !== generacion) { return; }
                 conexion.disponible = true;
                 conexion.avisoMostrado = false;
                 aplicarEstado(dto);
             })
-            .catch(function () {
+            .catch(function (error) {
+                if ((error && error.name === 'AbortError') || genActual !== generacion) { return; }
                 conexion.disponible = false;
                 marcarSinServidor();
             })
             .finally(function () {
-                window.setTimeout(consultarEstado, CONFIG.intervaloMs);
+                if (activo && genActual === generacion) {
+                    temporizador = window.setTimeout(consultarEstado, CONFIG.intervaloMs);
+                }
             });
     }
 
@@ -297,17 +329,36 @@
     }
 
     function arrancarPolling() {
+        if (activo) { return; }
+        activo = true;
+        generacion += 1;
+        conexion.avisoMostrado = false;
         consultarEstado();
     }
 
-    if (typeof window.cambiarModo === 'function') {
-        prepararEnvoltorios();
+    function detenerPolling() {
+        activo = false;
+        generacion += 1;
+        if (temporizador) {
+            window.clearTimeout(temporizador);
+            temporizador = null;
+        }
+        if (peticionEnCurso) {
+            peticionEnCurso.abort();
+            peticionEnCurso = null;
+        }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', arrancarPolling);
-    } else {
-        arrancarPolling();
+    /* app.js avisa cuando hay sesión. Antes del login no se consulta nada. */
+    document.addEventListener('semaforoplus:sesion-iniciada', arrancarPolling);
+    document.addEventListener('semaforoplus:sesion-cerrada', function () {
+        detenerPolling();
+        conexion.disponible = false;
+        conexion.esp32 = false;
+    });
+
+    if (typeof window.cambiarModo === 'function') {
+        prepararEnvoltorios();
     }
 
     /* API pública mínima para depurar desde la consola del navegador. */

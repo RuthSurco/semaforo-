@@ -18,6 +18,8 @@
     Si el ESP32 no está conectado, el backend genera datos simulados para que
     el sistema siga siendo demostrable. El archivo conexion.js es el encargado
     de consultar /api/estado y pintar la información en pantalla.
+    El login lo valida el backend con Spring Security (sesión + BCrypt): las
+    credenciales y los roles viven en la base de datos, no en este archivo.
     ============================================================================
 -->
 
@@ -51,7 +53,7 @@
                 <span class="cargador" aria-hidden="true"></span>
             </button>
 
-            <p class="login-pie">Prototipo académico — autenticación simulada</p>
+            <p class="login-pie">Prototipo académico — autenticación validada por el servidor</p>
         </form>
     </main>
 </div>
@@ -348,7 +350,7 @@
                   - Google Maps (JavaScript API + API key),
                   - OpenStreetMap,
                   - Leaflet + OpenStreetMap,
-                o por un endpoint propio en Django que devuelva JSON de
+                o por un endpoint propio en Spring Boot que devuelva JSON de
                 posiciones. Ninguna de esas opciones es obligatoria aquí para
                 que el prototipo funcione sin internet y sin claves de API.
             -->
@@ -400,7 +402,7 @@
                         <p class="texto-ayuda texto-suave">
                             La ruta azul representa el flujo monitoreado del prototipo.
                             En una versión real la ruta se calcularía con un motor de rutas
-                            (Django + datos de tráfico) y se dibujaría sobre el mapa.
+                            (Spring Boot + datos de tráfico) y se dibujaría sobre el mapa.
                         </p>
                     </article>
                 </div>
@@ -507,8 +509,10 @@
                     </div>
 
                     <p class="texto-ayuda texto-suave">
-                        Los cambios se mantienen solo en memoria durante la sesión del prototipo.
-                        En una versión real se guardarían en MariaDB mediante Django.
+                        Los usuarios se guardan en la base de datos H2 del backend (tabla
+                        <code>usuarios</code>) y la contraseña se almacena cifrada con BCrypt.
+                        Como H2 está en memoria, los usuarios creados se pierden al reiniciar
+                        el servidor; las cuentas demo se vuelven a crear al arrancar.
                     </p>
                 </article>
             </section>
@@ -637,6 +641,10 @@
             <label class="campo">
                 <span class="campo-etiqueta">Usuario</span>
                 <input type="text" id="usuario-username" placeholder="usuario" spellcheck="false">
+            </label>
+            <label class="campo">
+                <span class="campo-etiqueta">Contraseña</span>
+                <input type="password" id="usuario-clave" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
             </label>
             <label class="campo">
                 <span class="campo-etiqueta">Rol</span>

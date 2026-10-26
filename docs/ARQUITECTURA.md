@@ -41,12 +41,13 @@ estadísticas) si algún día crece.
 | Capa | Paquete | Clases | Responsabilidad |
 |---|---|---|---|
 | Arranque | `com.semaforoplus` | `SemaforoPlusApplication` | Configura Spring, habilita `@Scheduled` |
-| Presentación | `web` | `ApiController`, `ApiExceptionHandler` | HTTP, validación de entrada, formato de errores |
-| Contratos | `web.dto` | `EstadoDto`, `TelemetriaRequest`, `LecturaDto`, `EstadisticasDto`, `ComandoDto`, `SerieDto`, `TraficoDto` | Forma de los datos que viajan por la API |
-| Negocio | `servicio` | `SemaforoService`, `EstadisticasService`, `SimuladorSemaforo` | Estado del semáforo, detecciones, comandos, cálculo de estadísticas, simulación |
-| Persistencia | `repositorio` | `LecturaRepository` | Consultas JPA sobre el historial |
-| Modelo | `modelo` | `Lectura` | Entidad JPA (tabla `lecturas`) |
-| Configuración | `resources` | `application.yml` | Puerto, datasource, parámetros del simulador |
+| Seguridad | `config` | `SeguridadConfig`, `FiltroUsuarioActivo`, `InicializadorDatos` | Login, sesión, roles y cuentas iniciales |
+| Presentación | `web` | `ApiController`, `AuthController`, `UsuarioController`, `ApiExceptionHandler` | HTTP, validación de entrada, formato de errores |
+| Contratos | `web.dto` | `EstadoDto`, `TelemetriaRequest`, `LecturaDto`, `EstadisticasDto`, `ComandoDto`, `SerieDto`, `TraficoDto`, `LoginRequest`, `SesionDto`, `UsuarioDto`, `UsuarioRequest` | Forma de los datos que viajan por la API |
+| Negocio | `servicio` | `SemaforoService`, `EstadisticasService`, `SimuladorSemaforo`, `UsuarioService` | Estado del semáforo, estadísticas, simulación, usuarios y login |
+| Persistencia | `repositorio` | `LecturaRepository`, `UsuarioRepository` | Consultas JPA sobre historial y usuarios |
+| Modelo | `modelo` | `Lectura`, `Usuario`, `Rol` | Entidades JPA (tablas `lecturas` y `usuarios`) |
+| Configuración | `resources` | `application.yml` | Puerto, datasource, simulador, sesión y clave inicial |
 
 **Regla que se respeta en todo el código:** el controlador no tiene lógica de
 negocio; el servicio no conoce HTTP; el repositorio no conoce reglas.
@@ -158,7 +159,39 @@ primer arranque. En cuanto hay historial, la etiqueta cambia a
 
 ---
 
-## 6. Frontend
+## 6. Seguridad y usuarios
+
+El login es real: lo valida **Spring Security** en el backend.
+
+| Elemento | Implementación |
+|---|---|
+| Contraseñas | Hash **BCrypt** en la tabla `usuarios`; nunca se guardan ni se devuelven en claro |
+| Sesión | Cookie `JSESSIONID` **HttpOnly** + `SameSite=Lax`, 8 h de inactividad |
+| Roles | `SUPERADMIN` (todo) y `ADMIN` (consulta y control) |
+| Login | `POST /api/auth/login` con JSON; devuelve los datos de la sesión |
+| Restauración | `GET /api/auth/yo` (`204` si no hay sesión abierta) |
+| Logout | `POST /api/auth/logout` invalida la sesión en el servidor |
+| Gestión de usuarios | Solo `SUPERADMIN`; el backend impide quedarse sin ningún superadministrador activo |
+
+**Endpoints abiertos** (el ESP32 no maneja cookies): `/api/telemetria`,
+`/api/lecturas`, `GET /api/control/pendiente` y `/api/salud`. El resto de
+`/api/**` exige sesión y `/api/usuarios/**` exige rol `SUPERADMIN`.
+
+**Cambios en caliente:** `FiltroUsuarioActivo` revisa en cada petición que la
+cuenta siga existiendo y activa. Si el rol cambió, aplica el nuevo de inmediato;
+si la cuenta se elimina o desactiva, la sesión abierta deja de valer.
+
+**CSRF desactivado** a propósito: la API se consume desde la misma página y el
+ESP32 no envía cookies. Si el proyecto se publicara en internet con formularios
+de terceros, habría que reactivarlo.
+
+**Cuentas iniciales:** `InicializadorDatos` crea `superadmin` y `admin` al
+arrancar con la clave de `semaforo.seguridad.clave-inicial`. Como H2 está en
+memoria, se vuelven a crear en cada reinicio.
+
+---
+
+## 7. Frontend
 
 - **SPA sin framework**: `app.js` guarda el estado en `estadoAplicacion` y tiene
   funciones de render (`actualizarSemaforo`, `actualizarDashboard`, …). Al
@@ -170,12 +203,18 @@ primer arranque. En cuanto hay historial, la etiqueta cambia a
   - sobrescribe `renderizarEstadisticas` para pedir los datos reales;
   - si el backend no responde, **restaura el comportamiento local** y avisa con
     un toast.
-- **Degradación elegante**: abrir `index.html` con doble clic (sin servidor)
-  sigue funcionando con la simulación original del navegador.
+- **Sesión integrada**: `app.js` hace `POST /api/auth/login`, restaura la sesión
+  con `GET /api/auth/yo` y cierra con `POST /api/auth/logout`. Al iniciar o
+  cerrar sesión emite eventos (`semaforoplus:sesion-iniciada` /
+  `semaforoplus:sesion-cerrada`) que `conexion.js` usa para arrancar o detener
+  el polling.
+- **Degradación elegante**: si el backend no responde tras el login, la interfaz
+  vuelve a la simulación local y avisa con un toast. En la pantalla de login no
+  se consulta la API.
 
 ---
 
-## 7. Decisiones y justificación
+## 8. Decisiones y justificación
 
 | Decisión | Motivo |
 |---|---|
@@ -185,12 +224,15 @@ primer arranque. En cuanto hay historial, la etiqueta cambia a
 | Polling de 1 s | Suficiente, sin infraestructura extra; SSE/WebSocket queda como mejora |
 | H2 en memoria | Cero instalación para la demo; migrable a MariaDB cambiando el datasource |
 | Simulador en servidor | La demo nunca se cae por falta de hardware |
+| Sesión + cookie HttpOnly | Más simple que JWT para una web same-origin y fácil de revocar |
+| BCrypt | Estándar para hash de contraseñas, incluido en Spring Security |
+| Autorización en el servidor | Ocultar botones no es seguridad: el backend valida cada ruta |
 | `conexion.js` separado | No se modifica la lógica original de `app.js` |
-| Sin Machine Learning | Un solo sensor de distancia no aporta datos suficientes; ver §9 |
+| Sin Machine Learning | Un solo sensor de distancia no aporta datos suficientes; ver §10 |
 
 ---
 
-## 8. Escalabilidad (qué cambiaría si creciera)
+## 9. Escalabilidad (qué cambiaría si creciera)
 
 1. **Base de datos**: MariaDB/PostgreSQL + Flyway para versionar el esquema.
 2. **Tiempo real**: SSE (`SseEmitter`) o WebSocket en lugar de polling.
@@ -198,14 +240,14 @@ primer arranque. En cuanto hay historial, la etiqueta cambia a
    pasaría a devolver una lista.
 4. **IoT real**: MQTT (Mosquitto) para que los ESP32 publiquen en un broker en
    vez de hacer HTTP directo; permite miles de dispositivos.
-5. **Seguridad**: Spring Security con JWT, roles `SUPERADMIN` / `ADMIN`, y API
-   keys por dispositivo.
+5. **Seguridad**: API keys por dispositivo para los endpoints del ESP32 y JWT
+   si se abre la API a otros clientes.
 6. **Observabilidad**: Actuator + Micrometer + Prometheus.
 7. **Despliegue**: Docker Compose (app + MariaDB) y CI/CD a Render/Railway.
 
 ---
 
-## 9. Sobre Machine Learning (para la exposición)
+## 10. Sobre Machine Learning (para la exposición)
 
 El sistema **no usa ML** y es una decisión técnica defendible:
 
@@ -230,11 +272,12 @@ Se documenta como **módulo opcional**, no como parte de lo entregado.
 
 ---
 
-## 10. Limitaciones conocidas
+## 11. Limitaciones conocidas
 
-- Login simulado en el navegador (`localStorage`), sin autenticación real.
-- H2 en memoria: el historial se pierde al apagar.
+- H2 en memoria: el historial y los usuarios creados se pierden al apagar.
+- Los endpoints de telemetría y comandos del ESP32 están abiertos a propósito;
+  deben usarse en una red de confianza (aula).
 - Cámara y mapa son simulaciones visuales (CSS), no hardware ni APIs externas.
 - Comunicación por polling, no push.
-- La API no tiene autenticación: debe usarse en una red de confianza (aula).
+- CSRF desactivado por ser una API same-origin consumida por la propia web.
 - El firmware asume un único semáforo y un único sensor.

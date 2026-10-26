@@ -6,6 +6,11 @@ Todas las respuestas son **JSON UTF-8**. Los endpoints aceptan JSON y, en el cas
 de la telemetría, también parámetros de formulario (`application/x-www-form-urlencoded`)
 para que el ESP32 pueda enviar datos con un `POST` simple.
 
+> 🔐 La mayoría de rutas exige **sesión iniciada** (cookie `JSESSIONID`). El
+> ESP32 no usa cookies: sus endpoints de telemetría y comandos quedan abiertos.
+> La web hace el login con `fetch` y el navegador guarda la cookie sola.
+
+- [Autenticación y sesión](#autenticación-y-sesión)
 - [1. Estado](#1-estado)
 - [2. Telemetría](#2-telemetría)
 - [3. Control](#3-control)
@@ -15,6 +20,76 @@ para que el ESP32 pueda enviar datos con un `POST` simple.
 - [7. Salud](#7-salud)
 - [8. Errores](#8-errores)
 - [9. Resumen para el equipo de hardware](#9-resumen-para-el-equipo-de-hardware)
+
+---
+
+## Autenticación y sesión
+
+| Ruta | Sesión | Rol necesario |
+|---|---|---|
+| `POST /api/auth/login` | No | — |
+| `GET /api/auth/yo` | No | — |
+| `POST /api/auth/logout` | No | — |
+| `POST/PUT/DELETE /api/usuarios/**` | Sí | `SUPERADMIN` |
+| `/api/estado`, `/api/historial`, `/api/estadisticas`, `/api/control/modo`, `/api/control/color`, `/api/simulacion/**` | Sí | Cualquiera |
+| `/api/telemetria`, `/api/lecturas`, `/api/control/pendiente`, `/api/salud` | No | — |
+
+### `POST /api/auth/login`
+
+**Cuerpo**
+
+```json
+{ "usuario": "superadmin", "clave": "123456" }
+```
+
+**Respuesta 200** (y cabecera `Set-Cookie: JSESSIONID=...; HttpOnly`)
+
+```json
+{
+  "id": 1,
+  "nombre": "Super Usuario",
+  "usuario": "superadmin",
+  "rol": "Superadministrador",
+  "rolCodigo": "SUPERADMIN",
+  "activo": true,
+  "ultimoAcceso": "26/10/2026 13:26"
+}
+```
+
+**Errores**
+
+| Código | Caso |
+|---|---|
+| `400` | Falta usuario o contraseña |
+| `401` | Credenciales incorrectas o cuenta desactivada |
+
+### `GET /api/auth/yo`
+
+Devuelve la sesión actual al recargar la página.
+
+- **200** con el mismo JSON del login.
+- **204 No Content** si no hay sesión (así el navegador no muestra un error de
+  red al abrir el login).
+
+### `POST /api/auth/logout`
+
+Invalida la sesión en el servidor.
+
+```json
+{ "ok": true, "mensaje": "Sesión cerrada." }
+```
+
+### Gestión de usuarios (`SUPERADMIN`)
+
+- `GET /api/usuarios` — lista.
+- `POST /api/usuarios` — crea. Cuerpo: `nombre`, `usuario`, `clave`, `rol`,
+  `activo`.
+- `PUT /api/usuarios/{id}` — edita; si `clave` va vacío se conserva la actual.
+- `DELETE /api/usuarios/{id}` — elimina.
+
+`rol` acepta `Administrador` / `Superadministrador` (o `ADMIN` / `SUPERADMIN`).
+El backend **nunca devuelve la contraseña** y rechaza quedarse sin ningún
+superadministrador activo.
 
 ---
 
@@ -309,6 +384,8 @@ Formato uniforme (`ApiExceptionHandler`):
 | Código | Cuándo |
 |---|---|
 | `400` | Datos inválidos, JSON mal formado, regla de negocio incumplida |
+| `401` | Sin sesión o credenciales incorrectas |
+| `403` | Sesión válida pero sin el rol necesario (por ejemplo, un administrador en `/api/usuarios`) |
 | `404` | Recurso estático inexistente (por ejemplo `/favicon.ico`) |
 | `500` | Error interno no controlado |
 
@@ -334,32 +411,45 @@ segundos y el simulador del servidor se detiene solo.
 ### Prueba rápida desde PowerShell
 
 ```powershell
-# Ver el estado
-Invoke-RestMethod http://localhost:8080/api/estado | ConvertTo-Json
+# 1. Iniciar sesión y guardar la cookie en $sesion
+$cuerpo = '{"usuario":"superadmin","clave":"123456"}'
+Invoke-RestMethod -Method Post http://localhost:8080/api/auth/login `
+  -ContentType "application/json" -Body $cuerpo -SessionVariable sesion
 
-# Simular una lectura del ESP32
+# 2. Ver el estado (requiere sesión)
+Invoke-RestMethod http://localhost:8080/api/estado -WebSession $sesion | ConvertTo-Json
+
+# 3. Simular una lectura del ESP32 (no requiere sesión)
 Invoke-RestMethod -Method Post `
   "http://localhost:8080/api/telemetria?distancia=25&vehiculo=1"
 
-# Debe responder esp32Conectado = true
+# 4. Debe responder esp32Conectado = true
 Invoke-RestMethod http://localhost:8080/api/salud | ConvertTo-Json
 
-# Ver un comando pendiente
+# 5. Cambiar el modo y ver el comando pendiente
 Invoke-RestMethod -Method Put http://localhost:8080/api/control/modo `
-  -ContentType "application/json" -Body '{"modo":"manual"}'
+  -ContentType "application/json" -Body '{"modo":"manual"}' -WebSession $sesion
 Invoke-RestMethod http://localhost:8080/api/control/pendiente | ConvertTo-Json
 ```
 
 ### Prueba rápida desde curl
 
 ```bash
-curl http://localhost:8080/api/estado
+# 1. Login: guarda la cookie en cookies.txt
+curl -c cookies.txt -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"usuario":"superadmin","clave":"123456"}'
 
+# 2. Estado con la sesión
+curl -b cookies.txt http://localhost:8080/api/estado
+
+# 3. Telemetría (abierta para el ESP32)
 curl -X POST http://localhost:8080/api/telemetria \
   -H "Content-Type: application/json" \
   -d '{"distanciaCm":32,"vehiculoDetectado":true}'
 
-curl -X PUT http://localhost:8080/api/control/color \
+# 4. Control con la sesión
+curl -b cookies.txt -X PUT http://localhost:8080/api/control/color \
   -H "Content-Type: application/json" \
   -d '{"color":"rojo"}'
 ```

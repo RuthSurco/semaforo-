@@ -16,6 +16,10 @@ backend **Spring Boot** con base de datos **H2**.
 
 ## 📸 Vista rápida
 
+| Inicio de sesión | Gestión de usuarios |
+|---|---|
+| ![Login](docs/img/login.png) | ![Usuarios](docs/img/usuarios.png) |
+
 | Dashboard | Semáforos |
 |---|---|
 | ![Dashboard](docs/img/dashboard.png) | ![Semáforos](docs/img/semaforos.png) |
@@ -26,8 +30,9 @@ backend **Spring Boot** con base de datos **H2**.
 
 ![Estadísticas](docs/img/estadisticas.png)
 
-> Las capturas son de la simulación integrada. Cuando conectes el ESP32, el
-> indicador cambiará a **ESP32 conectado**.
+> Las capturas de sensores son de la simulación integrada. Cuando conectes el
+> ESP32, el indicador cambiará a **ESP32 conectado**. El login y la gestión de
+> usuarios ya usan el backend real.
 
 ---
 
@@ -117,13 +122,16 @@ mvn spring-boot:run
 
 Abre: **http://localhost:8080**
 
-| Usuario | Contraseña |
-|---|---|
-| `superadmin` | `123456` |
-| `admin` | `123456` |
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `superadmin` | `123456` | Superadministrador |
+| `admin` | `123456` | Administrador |
 
-> ⚠️ El login actual es **simulado en el navegador** (igual que el prototipo
-> original). Migrarlo a Spring Security está en el roadmap.
+> 🔐 El login es **real**: lo valida **Spring Security** contra la tabla
+> `usuarios` de H2 y guarda las contraseñas con **BCrypt**. La sesión usa una
+> cookie `JSESSIONID` (HttpOnly) y el rol se comprueba en el servidor.
+> Cambia la contraseña inicial en `application.yml`
+> (`semaforo.seguridad.clave-inicial`) o desde **Gestión de usuarios**.
 
 ### Consola de base de datos
 
@@ -139,9 +147,10 @@ Abre: **http://localhost:8080**
 .
 ├── backend/                      # Aplicación Spring Boot
 │   ├── src/main/java/com/semaforoplus/
-│   │   ├── modelo/               # Entidad Lectura
+│   │   ├── config/               # Spring Security, filtros, datos iniciales
+│   │   ├── modelo/               # Entidades Lectura y Usuario
 │   │   ├── repositorio/          # Spring Data JPA
-│   │   ├── servicio/             # Reglas, simulador, estadísticas
+│   │   ├── servicio/             # Reglas, simulador, estadísticas, usuarios
 │   │   └── web/                  # Controladores, DTOs, errores
 │   ├── src/main/resources/
 │   │   ├── application.yml
@@ -171,20 +180,33 @@ Abre: **http://localhost:8080**
 
 ## 🔌 API REST
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/estado` | Estado actual del semáforo |
-| POST | `/api/telemetria` | El ESP32 envía una lectura |
-| GET | `/api/telemetria?distancia=30&vehiculo=1` | Alternativa por parámetros |
-| PUT | `/api/control/modo` | Cambia a `automatico` o `manual` |
-| PUT | `/api/control/color` | Cambia el color (solo en manual) |
-| GET | `/api/control/pendiente` | Comando pendiente para el ESP32 |
-| GET | `/api/historial?limite=50` | Últimas lecturas |
-| GET | `/api/estadisticas?periodo=hoy` | Estadísticas del periodo |
-| POST | `/api/simulacion/{accion}` | Simula `acercar`, `alejar`, `via-libre`, `restablecer` |
-| GET | `/api/salud` | Estado del servidor |
+| Método | Ruta | Sesión | Descripción |
+|---|---|---|---|
+| POST | `/api/auth/login` | No | Inicia sesión y devuelve el usuario |
+| GET | `/api/auth/yo` | No | Sesión actual (`204` si no hay) |
+| POST | `/api/auth/logout` | No | Cierra la sesión en el servidor |
+| GET | `/api/estado` | Sí | Estado actual del semáforo |
+| POST | `/api/telemetria` | No | El ESP32 envía una lectura |
+| GET | `/api/telemetria?distancia=30&vehiculo=1` | No | Alternativa por parámetros |
+| PUT | `/api/control/modo` | Sí | Cambia a `automatico` o `manual` |
+| PUT | `/api/control/color` | Sí | Cambia el color (solo en manual) |
+| GET | `/api/control/pendiente` | No | Comando pendiente para el ESP32 |
+| GET | `/api/historial?limite=50` | Sí | Últimas lecturas |
+| GET | `/api/estadisticas?periodo=hoy` | Sí | Estadísticas del periodo |
+| POST | `/api/simulacion/{accion}` | Sí | Simula `acercar`, `alejar`, `via-libre`, `restablecer` |
+| GET | `/api/usuarios` | Superadmin | Lista los usuarios |
+| POST/PUT/DELETE | `/api/usuarios/{id}` | Superadmin | Crea, edita o elimina usuarios |
+| GET | `/api/salud` | No | Estado del servidor |
 
 📖 Contrato completo con ejemplos en [docs/API.md](docs/API.md).
+
+### Seguridad en dos frases
+
+- **Administrador**: puede ver el dashboard, controlar el semáforo y consultar
+  estadísticas.
+- **Superadministrador**: además gestiona usuarios y configuración. El backend
+  devuelve `403` si un administrador intenta esas rutas y `401` si no hay
+  sesión.
 
 ---
 
@@ -236,8 +258,9 @@ git push -u origin feature/mi-cambio
 - [x] Simulador de respaldo sin hardware.
 - [x] Historial y estadísticas en H2.
 - [x] Documentación, capturas y CI.
-- [ ] Autenticación real con Spring Security (usuarios en BD).
-- [ ] Mover usuarios y configuración de `localStorage` a la base de datos.
+- [x] Autenticación real con Spring Security (BCrypt, sesión y roles).
+- [x] Usuarios en base de datos con gestión desde la web.
+- [ ] Mover la configuración visual de `localStorage` a la base de datos.
 - [ ] Tiempo real con SSE o WebSocket (reemplazar el polling).
 - [ ] Mapa real con Leaflet + OpenStreetMap.
 - [ ] Cámara real ESP32-CAM (stream MJPEG).
@@ -249,11 +272,14 @@ git push -u origin feature/mi-cambio
 
 ## ⚠️ Limitaciones conocidas
 
-- El **login es simulado** y los usuarios viven en el navegador.
-- La **base de datos H2 es en memoria**: el historial se reinicia al apagar.
+- La **base de datos H2 es en memoria**: el historial y los usuarios creados se
+  reinician al apagar. Las cuentas demo se vuelven a crear al arrancar.
+- Los endpoints de **telemetría y comandos del ESP32 están abiertos** a propósito
+  (el dispositivo no maneja cookies). Úsalos solo en una red de confianza.
 - La **cámara y el mapa son simulaciones** (no usan hardware ni APIs externas).
 - La comunicación usa **polling cada segundo** (suficiente para la demo).
-- La API **no tiene autenticación** todavía; úsala solo en una red de confianza.
+- **CSRF está desactivado** porque la API se consume desde la misma página; si se
+  publicara en internet habría que reactivarlo.
 
 ---
 
