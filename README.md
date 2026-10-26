@@ -10,6 +10,7 @@ backend **Spring Boot** con base de datos **H2**.
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-blue)
 ![Frontend](https://img.shields.io/badge/Frontend-HTML%20%7C%20CSS%20%7C%20JS-yellow)
 ![Estado](https://img.shields.io/badge/estado-funcional-brightgreen)
+[![Build](https://github.com/RuthSurco/semaforo-/actions/workflows/build.yml/badge.svg)](https://github.com/RuthSurco/semaforo-/actions/workflows/build.yml)
 
 ---
 
