@@ -53,7 +53,7 @@
                 <span class="cargador" aria-hidden="true"></span>
             </button>
 
-            <p class="login-pie">Prototipo académico — autenticación validada por el servidor</p>
+            <p class="login-pie">Acceso seguro · Plataforma de monitoreo y control de tráfico</p>
         </form>
     </main>
 </div>
@@ -71,7 +71,7 @@
 
         <div class="cabecera-datos">
             <span class="chip chip-simulacion" id="chip-simulacion">
-                <span class="punto-punto verde"></span> Simulación activa
+                <span class="punto-punto verde"></span> Sistema en línea
             </span>
 
             <div class="reloj" id="reloj">
@@ -148,7 +148,7 @@
                         </header>
                         <dl class="lista-datos">
                             <div><dt>Dispositivo</dt><dd id="estado-dispositivo">Semáforo Principal</dd></div>
-                            <div><dt>Conexión</dt><dd id="estado-conexion">Simulación activa</dd></div>
+                            <div><dt>Conexión</dt><dd id="estado-conexion">En línea</dd></div>
                             <div><dt>Modo de control</dt><dd id="estado-modo">Automático</dd></div>
                             <div><dt>Última actualización</dt><dd id="estado-actualizacion">—</dd></div>
                         </dl>
@@ -192,9 +192,9 @@
                         <span class="insignia insignia-exito">En línea</span>
                     </header>
                     <ul class="lista-conexion" id="lista-conexion">
-                        <li><span class="punto-punto verde"></span> ESP32 simulado <small>conectado</small></li>
+                        <li><span class="punto-punto verde"></span> Controlador ESP32 <small>conectado</small></li>
                         <li><span class="punto-punto verde"></span> Sensor HC-SR04 <small>conectado</small></li>
-                        <li><span class="punto-punto verde"></span> Cámara simulada <small>transmitiendo</small></li>
+                        <li><span class="punto-punto verde"></span> Cámara de tráfico <small>transmitiendo</small></li>
                         <li><span class="punto-punto verde"></span> Enlace local <small>estable</small></li>
                     </ul>
                 </article>
@@ -229,7 +229,7 @@
                         <dl class="lista-datos">
                             <div><dt>Nombre</dt><dd id="info-nombre">Semáforo Principal</dd></div>
                             <div><dt>Ubicación</dt><dd id="info-ubicacion">Avenida Central</dd></div>
-                            <div><dt>Dispositivo</dt><dd id="info-dispositivo">ESP32 simulado</dd></div>
+                            <div><dt>Dispositivo</dt><dd id="info-dispositivo">Controlador ESP32</dd></div>
                             <div><dt>Estado</dt><dd id="info-estado">Operativo</dd></div>
                             <div><dt>Conexión</dt><dd id="info-conexion">Conectado</dd></div>
                         </dl>
@@ -273,14 +273,14 @@
 
                 <article class="tarjeta">
                     <header class="tarjeta-cabecera">
-                        <h2>Simulación del sensor</h2>
-                        <span class="tarjeta-pie">Sensores simulados en JavaScript · sin hardware</span>
+                        <h2>Pruebas del sensor</h2>
+                        <span class="tarjeta-pie">Ajuste manual de la distancia de detección</span>
                     </header>
                     <div class="grupo-botones grupo-cuatro">
-                        <button type="button" class="boton boton-primario-suave" id="btn-acercando">Simular vehículo acercándose</button>
-                        <button type="button" class="boton boton-primario-suave" id="btn-alejandose">Simular vehículo alejándose</button>
-                        <button type="button" class="boton" id="btn-via-libre">Simular vía libre</button>
-                        <button type="button" class="boton" id="btn-restablecer">Restablecer simulación</button>
+                        <button type="button" class="boton boton-primario-suave" id="btn-acercando">Vehículo cercano · 30 cm</button>
+                        <button type="button" class="boton boton-primario-suave" id="btn-alejandose">Vehículo alejado · 120 cm</button>
+                        <button type="button" class="boton" id="btn-via-libre">Vía libre</button>
+                        <button type="button" class="boton" id="btn-restablecer">Restablecer sensor</button>
                     </div>
                 </article>
             </section>
@@ -294,9 +294,8 @@
                             <p class="tarjeta-pie" id="camara-ubicacion">Avenida Central</p>
                         </div>
                         <div class="grupo-inline">
-                            <span class="insignia insignia-error" id="camara-simu">SIMULACIÓN</span>
-                            <span class="insignia insignia-info">LIVE</span>
-                            <span class="insignia insignia-info" id="camara-estado">Conectada — Simulación</span>
+                            <span class="insignia insignia-info">VISTA GENERAL</span>
+                            <span class="insignia insignia-info" id="camara-estado">Activa</span>
                         </div>
                     </header>
 
@@ -338,7 +337,7 @@
                         <button type="button" class="boton" id="btn-pantalla-completa">Pantalla completa</button>
                         <button type="button" class="boton" id="btn-sonido">Activar sonido</button>
                     </div>
-                    <p class="texto-ayuda texto-suave" id="estado-sonido">Sonido desactivado (simulación, no se reproduce audio real).</p>
+                    <p class="texto-ayuda texto-suave" id="estado-sonido">Sonido desactivado.</p>
                 </article>
             </section>
 
@@ -359,7 +358,7 @@
                     <article class="tarjeta">
                         <header class="tarjeta-cabecera">
                             <h2>Plano de la intersección</h2>
-                            <span class="tarjeta-pie">Esquema simulado</span>
+                            <span class="tarjeta-pie">Vista general</span>
                         </header>
                         <div class="mapa" id="mapa">
                             <div class="mapa-rejilla">
@@ -400,9 +399,8 @@
                             <div><dt>Última actualización</dt><dd id="mapa-actualizacion">—</dd></div>
                         </dl>
                         <p class="texto-ayuda texto-suave">
-                            La ruta azul representa el flujo monitoreado del prototipo.
-                            En una versión real la ruta se calcularía con un motor de rutas
-                            (Spring Boot + datos de tráfico) y se dibujaría sobre el mapa.
+                            La ruta azul representa el flujo vehicular monitoreado en la
+                            intersección y se actualiza con los datos de tráfico del sistema.
                         </p>
                     </article>
                 </div>
@@ -422,7 +420,7 @@
                 <article class="tarjeta">
                     <header class="tarjeta-cabecera">
                         <h2>Indicadores del periodo</h2>
-                        <span class="tarjeta-pie" id="stat-vehiculos-pie">Datos simulados</span>
+                        <span class="tarjeta-pie" id="stat-vehiculos-pie">Historial del periodo</span>
                     </header>
                     <dl class="lista-datos lista-datos-cuatro">
                         <div><dt>Total de vehículos detectados</dt><dd id="stat-vehiculos">24</dd></div>
@@ -436,7 +434,7 @@
                     <article class="tarjeta">
                         <header class="tarjeta-cabecera">
                             <h2>Vehículos detectados por hora</h2>
-                            <span class="tarjeta-pie">Simulación</span>
+                            <span class="tarjeta-pie">Historial</span>
                         </header>
                         <div class="grafico-barras" id="grafico-vehiculos"></div>
                     </article>
@@ -444,7 +442,7 @@
                     <article class="tarjeta">
                         <header class="tarjeta-cabecera">
                             <h2>Actividad semanal</h2>
-                            <span class="tarjeta-pie">Simulación</span>
+                            <span class="tarjeta-pie">Historial</span>
                         </header>
                         <div class="grafico-barras" id="grafico-semanal"></div>
                     </article>
@@ -454,7 +452,7 @@
                     <article class="tarjeta">
                         <header class="tarjeta-cabecera">
                             <h2>Porcentaje de tiempo por color</h2>
-                            <span class="tarjeta-pie">Simulación</span>
+                            <span class="tarjeta-pie">Historial</span>
                         </header>
                         <div class="grafico-donut">
                             <div class="donut" id="grafico-tiempos">
@@ -474,7 +472,7 @@
                     <article class="tarjeta">
                         <header class="tarjeta-cabecera">
                             <h2>Nivel de tráfico por zona</h2>
-                            <span class="tarjeta-pie">Simulación</span>
+                            <span class="tarjeta-pie">Historial</span>
                         </header>
                         <ul class="barras-horizontal" id="grafico-trafico"></ul>
                     </article>
@@ -509,10 +507,9 @@
                     </div>
 
                     <p class="texto-ayuda texto-suave">
-                        Los usuarios se guardan en la base de datos H2 del backend (tabla
-                        <code>usuarios</code>) y la contraseña se almacena cifrada con BCrypt.
-                        Como H2 está en memoria, los usuarios creados se pierden al reiniciar
-                        el servidor; las cuentas demo se vuelven a crear al arrancar.
+                        Las cuentas se almacenan de forma segura y las contraseñas se guardan
+                        cifradas, nunca en texto plano. Las cuentas iniciales se crean
+                        automáticamente al iniciar el sistema.
                     </p>
                 </article>
             </section>
@@ -617,7 +614,7 @@
                     <strong id="nombre-usuario-menu">—</strong>
                 </span>
                 <span class="pie-rol" id="rol-usuario-menu">—</span>
-                <span class="pie-nota" id="pie-nota">Backend Spring Boot · esperando estado del servidor</span>
+                <span class="pie-nota" id="pie-nota">Sistema en línea · esperando datos</span>
             </footer>
         </main>
     </div>

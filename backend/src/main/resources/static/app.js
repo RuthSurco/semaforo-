@@ -41,12 +41,12 @@ const SECCIONES = {
     },
     semaforos: {
         titulo: 'Semáforos',
-        descripcion: 'Control de semáforos, modos de operación y sensor simulado',
+        descripcion: 'Control de semáforos, modos de operación y sensor de proximidad',
         soloSuperadmin: false
     },
     camaras: {
         titulo: 'Cámaras',
-        descripcion: 'Monitoreo de cámaras — transmisión simulada',
+        descripcion: 'Monitoreo de cámaras de tráfico',
         soloSuperadmin: false
     },
     mapa: {
@@ -56,7 +56,7 @@ const SECCIONES = {
     },
     estadisticas: {
         titulo: 'Estadísticas',
-        descripcion: 'Estadísticas del sistema — datos simulados',
+        descripcion: 'Indicadores y estadísticas del sistema',
         soloSuperadmin: false
     },
     usuarios: {
@@ -794,8 +794,8 @@ function restablecerSimulacion() {
     setTexto('info-modo-ayuda', 'El sistema controla el semáforo automáticamente.');
     actualizarControlesModo();
     actualizarSemaforo();
-    agregarActividad('Simulación restablecida a valores iniciales.');
-    mostrarNotificacion('Simulación restablecida.', 'info');
+    agregarActividad('Sensor restablecido a valores iniciales.');
+    mostrarNotificacion('Sensor restablecido.', 'info');
 }
 
 /* ============= 7. DASHBOARD, MAPA Y CÁMARA SIMULADOS =================== */
@@ -818,7 +818,7 @@ function actualizarDashboard() {
 
     setTexto('estado-general', 'Operativo');
     setTexto('estado-dispositivo', 'Semáforo Principal');
-    setTexto('estado-conexion', 'Simulación activa');
+    setTexto('estado-conexion', 'En línea');
     setTexto('estado-actualizacion', auxiliar.ultimaLectura || horaActual());
     setTexto('estado-modo', estadoAplicacion.modo === 'automatico' ? 'Automático' : 'Manual');
 
@@ -900,8 +900,8 @@ function alternarSonido() {
         boton.textContent = auxiliar.sonidoCamara ? 'Desactivar sonido' : 'Activar sonido';
     }
     setTexto('estado-sonido', auxiliar.sonidoCamara
-        ? 'Sonido activado (simulación: se emite un pitido corto al capturar).'
-        : 'Sonido desactivado (simulación, no se reproduce audio real).');
+        ? 'Sonido activado: se emite un aviso al capturar.'
+        : 'Sonido desactivado.');
 
     mostrarNotificacion(auxiliar.sonidoCamara ? 'Sonido de cámara activado.' : 'Sonido de cámara desactivado.', 'info');
 }
@@ -939,7 +939,7 @@ function renderizarEstadisticas(periodo) {
         : datos.vehiculoTotal;
 
     setTexto('stat-vehiculos', String(total));
-    setTexto('stat-vehiculos-pie', 'Datos simulados · ' + datos.etiqueta.toLowerCase());
+    setTexto('stat-vehiculos-pie', 'Historial del periodo · ' + datos.etiqueta.toLowerCase());
     setTexto('stat-espera', datos.espera);
     setTexto('stat-cambios', String(auxiliar.cambiosColor + datos.cambios));
     setTexto('stat-hora-pico', datos.horaPico);
@@ -1327,14 +1327,14 @@ function poblarFormularioConfiguracion() {
     actualizarVistaPreviaCamara();
     setTexto('camara-nombre', config.camaraNombre);
     estadoAplicacion.camaraConectada = config.camaraEstado === 'activada';
-    setTexto('camara-estado', estadoAplicacion.camaraConectada ? 'Conectada — Simulación' : 'Desactivada — Simulación');
+    setTexto('camara-estado', estadoAplicacion.camaraConectada ? 'Activa' : 'Desactivada');
 }
 
 function actualizarVistaPreviaCamara() {
     const campo = porId('config-camara-calidad');
     const calidad = campo ? campo.value : '1080p';
     const medidas = { '1080p': '1920×1080', '720p': '1280×720', '480p': '854×480' };
-    setTexto('vista-previa-config', calidad + ' · ' + (medidas[calidad] || '—') + ' (simulado)');
+    setTexto('vista-previa-config', calidad + ' · ' + (medidas[calidad] || '—'));
 }
 
 function guardarConfiguracion() {

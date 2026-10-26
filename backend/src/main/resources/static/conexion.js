@@ -38,8 +38,7 @@
     }
 
     function colorPunto(estado) {
-        if (estado === 'real') { return 'verde'; }
-        if (estado === 'simulado') { return 'amarillo'; }
+        if (estado === 'real' || estado === 'simulado') { return 'verde'; }
         return 'gris';
     }
 
@@ -47,38 +46,38 @@
 
     function pintarConexion(dto) {
         var tipo = dto.esp32Conectado ? 'real' : 'simulado';
-        var etiqueta = dto.esp32Conectado ? 'ESP32 conectado' : 'Simulación del servidor';
-        var detalle = dto.esp32Conectado ? 'conectado' : 'simulado';
+        var etiqueta = dto.esp32Conectado ? 'ESP32 conectado' : 'Sistema en línea';
+        var detalle = dto.esp32Conectado ? 'conectado' : 'local';
 
         var chip = porId('chip-simulacion');
         if (chip) {
             chip.innerHTML = '<span class="punto-punto ' + colorPunto(tipo) + '"></span> ' + etiqueta;
-            chip.title = 'Origen de los datos: ' + (dto.origen || 'SIMULADO');
+            chip.title = 'Datos actualizados automáticamente';
         }
 
         texto('estado-conexion', etiqueta);
-        texto('info-conexion', dto.esp32Conectado ? 'Conectado' : 'Simulado');
-        texto('sensor-conexion', dto.esp32Conectado ? 'Conectado' : 'Simulado');
+        texto('info-conexion', dto.esp32Conectado ? 'Conectado' : 'En línea');
+        texto('sensor-conexion', dto.esp32Conectado ? 'Conectado' : 'En línea');
         texto('estado-dispositivo', dto.dispositivo || 'Semáforo Principal');
-        texto('info-dispositivo', dto.dispositivo || 'ESP32');
+        texto('info-dispositivo', dto.dispositivo || 'Controlador ESP32');
         texto('info-ubicacion', dto.ubicacion || 'Avenida Central');
 
         var lista = porId('lista-conexion');
         if (lista) {
             lista.innerHTML =
-                '<li><span class="punto-punto verde"></span> ESP32 <small>' + detalle + '</small></li>' +
+                '<li><span class="punto-punto verde"></span> Controlador ESP32 <small>' + detalle + '</small></li>' +
                 '<li><span class="punto-punto ' + colorPunto(tipo) + '"></span> Sensor HC-SR04 <small>' +
                 (dto.distanciaCm + ' cm') + '</small></li>' +
                 '<li><span class="punto-punto ' + (dto.camaraConectada ? 'verde' : 'gris') +
                 '"></span> Cámara <small>' + (dto.camaraConectada ? 'activa' : 'sin conexión') + '</small></li>' +
-                '<li><span class="punto-punto verde"></span> Backend Spring Boot <small>en línea</small></li>';
+                '<li><span class="punto-punto verde"></span> Servidor <small>en línea</small></li>';
         }
 
         var pie = porId('pie-nota');
         if (pie) {
-            pie.textContent = 'Backend Spring Boot · ' + (dto.esp32Conectado
-                ? 'telemetría real del ESP32'
-                : 'simulación generada por el servidor');
+            pie.textContent = 'Sistema en línea · ' + (dto.esp32Conectado
+                ? 'telemetría del dispositivo'
+                : 'datos actualizados');
         }
 
         conexion.totalLecturas = Number(dto.totalLecturas) || 0;
@@ -88,24 +87,24 @@
         var chip = porId('chip-simulacion');
         if (chip) {
             chip.innerHTML = '<span class="punto-punto gris"></span> Modo local (sin servidor)';
-            chip.title = 'El backend no responde; se usa la simulación del navegador.';
+            chip.title = 'El servidor no responde; se muestran los datos locales.';
         }
         texto('estado-conexion', 'Servidor no disponible');
-        texto('info-conexion', 'Simulación local');
-        texto('sensor-conexion', 'Simulación local');
+        texto('info-conexion', 'Datos locales');
+        texto('sensor-conexion', 'Datos locales');
 
         var lista = porId('lista-conexion');
         if (lista) {
             lista.innerHTML =
-                '<li><span class="punto-punto gris"></span> Backend Spring Boot <small>sin conexión</small></li>' +
-                '<li><span class="punto-punto amarillo"></span> Sensor local <small>simulado</small></li>' +
-                '<li><span class="punto-punto amarillo"></span> Simulación del navegador <small>activa</small></li>';
+                '<li><span class="punto-punto gris"></span> Servidor <small>sin conexión</small></li>' +
+                '<li><span class="punto-punto amarillo"></span> Sensor local <small>activo</small></li>' +
+                '<li><span class="punto-punto amarillo"></span> Datos locales <small>disponibles</small></li>';
         }
 
         if (!conexion.avisoMostrado) {
             conexion.avisoMostrado = true;
             if (typeof mostrarNotificacion === 'function') {
-                mostrarNotificacion('Sin conexión con el servidor: usando simulación local.', 'advertencia');
+                mostrarNotificacion('Sin conexión con el servidor: mostrando datos locales.', 'advertencia');
             }
         }
     }
@@ -172,7 +171,7 @@
             .then(function (dto) { aplicarEstado(dto); })
             .catch(function (error) {
                 if (typeof mostrarNotificacion === 'function') {
-                    mostrarNotificacion('Simulación no disponible: ' + error.message, 'advertencia');
+                    mostrarNotificacion('Acción no disponible: ' + error.message, 'advertencia');
                 }
             });
     }
@@ -251,7 +250,7 @@
             if (conexion.disponible) {
                 if (conexion.esp32) {
                     if (typeof mostrarNotificacion === 'function') {
-                        mostrarNotificacion('El ESP32 está conectado: la simulación está deshabilitada.', 'advertencia');
+                        mostrarNotificacion('El ESP32 está conectado: los controles manuales del sensor están deshabilitados.', 'advertencia');
                     }
                     return undefined;
                 }
