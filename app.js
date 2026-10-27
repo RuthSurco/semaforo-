@@ -2,16 +2,16 @@
    SEMÁFORO+ — Lógica del prototipo (JavaScript puro, sin dependencias)
    ----------------------------------------------------------------------------
    CONTENIDO:
-     0. Aviso de seguridad (simulación)
-     1. Constantes: credenciales, secciones, usuarios, configuración, datos
+     0. Seguridad y sesión
+     1. Constantes: secciones, configuración, datos
      2. Estado central de la aplicación
      3. Utilidades de DOM, tiempo y formato
-     4. Sesión: iniciarSesion / cerrarSesion / verificarSesion
+     4. Sesión: login, cierre y restauración con el backend
      5. Permisos y navegación
      6. Semáforo: modos, color y sensor simulado
      7. Dashboard, mapa y cámara simulados
-     8. Estadísticas simuladas
-     9. Gestión de usuarios
+     8. Estadísticas
+     9. Gestión de usuarios (API del backend)
     10. Configuración
     11. Notificaciones (toast) y panel de la barra superior
     12. Reloj, menú móvil e inicialización
@@ -20,34 +20,16 @@
 'use strict';
 
 /* ==========================================================================
-   0. AVISO DE SEGURIDAD
+   0. SEGURIDAD Y SESIÓN
    ==========================================================================
-   IMPORTANTE:
-   Este inicio de sesión y sistema de permisos solo es una simulación frontend.
-   Las credenciales pueden ser visibles inspeccionando el código.
-   En una versión real se debe utilizar Django, sesiones seguras,
-   contraseñas cifradas, autorización en el servidor y una base de datos.
+   El login es REAL y lo valida el backend con Spring Security:
+   - La contraseña se envía una sola vez y se guarda cifrada (BCrypt) en H2.
+   - El navegador solo conserva la cookie de sesión JSESSIONID (HttpOnly).
+   - Ningún usuario ni contraseña está escrito en este archivo.
    ========================================================================== */
 
 /* ============================ 1. CONSTANTES ============================== */
 
-/* Credenciales simuladas. No son seguras: están en el código fuente. */
-const CREDENCIALES_SIMULADAS = {
-    superadmin: {
-        clave: '123456',
-        rol: 'Superadministrador',
-        nombre: 'Super Usuario',
-        iniciales: 'SU'
-    },
-    admin: {
-        clave: '123456',
-        rol: 'Administrador',
-        nombre: 'Administrador General',
-        iniciales: 'AG'
-    }
-};
-
-const CLAVE_SESION = 'semaforoplus_sesion';
 const CLAVE_CONFIGURACION = 'semaforoplus_config';
 
 /* Definición de las secciones: título, descripción y permisos. */
@@ -59,12 +41,12 @@ const SECCIONES = {
     },
     semaforos: {
         titulo: 'Semáforos',
-        descripcion: 'Control de semáforos, modos de operación y sensor simulado',
+        descripcion: 'Control de semáforos, modos de operación y sensor de proximidad',
         soloSuperadmin: false
     },
     camaras: {
         titulo: 'Cámaras',
-        descripcion: 'Monitoreo de cámaras — transmisión simulada',
+        descripcion: 'Monitoreo de cámaras de tráfico',
         soloSuperadmin: false
     },
     mapa: {
@@ -74,7 +56,7 @@ const SECCIONES = {
     },
     estadisticas: {
         titulo: 'Estadísticas',
-        descripcion: 'Estadísticas del sistema — datos simulados',
+        descripcion: 'Indicadores y estadísticas del sistema',
         soloSuperadmin: false
     },
     usuarios: {
@@ -88,26 +70,6 @@ const SECCIONES = {
         soloSuperadmin: true
     }
 };
-
-/* Usuarios iniciales del prototipo (solo viven en memoria). */
-const USUARIOS_INICIALES = [
-    {
-        id: 'u1',
-        nombre: 'Super Usuario',
-        usuario: 'superadmin',
-        rol: 'Superadministrador',
-        estado: 'Activo',
-        ultimoAcceso: 'En esta sesión'
-    },
-    {
-        id: 'u2',
-        nombre: 'Administrador General',
-        usuario: 'admin',
-        rol: 'Administrador',
-        estado: 'Activo',
-        ultimoAcceso: 'En esta sesión'
-    }
-];
 
 /* Configuración por defecto del sistema. */
 const CONFIGURACION_POR_DEFECTO = {
@@ -153,7 +115,7 @@ const DATOS_ESTADISTICAS = {
         trafico: [
             { zona: 'Avenida Central', nivel: 'moderado', porcentaje: 68 },
             { zona: 'Calle Norte', nivel: 'normal', porcentaje: 34 },
-            { zona: 'Cruce costing', nivel: 'intenso', porcentaje: 88 },
+            { zona: 'Cruce Costanera', nivel: 'intenso', porcentaje: 88 },
             { zona: 'Ronda Este', nivel: 'normal', porcentaje: 22 },
             { zona: 'Sensor 4 (sin conexión)', nivel: 'desconectado', porcentaje: 0 }
         ]
@@ -181,7 +143,7 @@ const DATOS_ESTADISTICAS = {
         trafico: [
             { zona: 'Avenida Central', nivel: 'intenso', porcentaje: 82 },
             { zona: 'Calle Norte', nivel: 'moderado', porcentaje: 55 },
-            { zona: 'Cruce costing', nivel: 'intenso', porcentaje: 94 },
+            { zona: 'Cruce Costanera', nivel: 'intenso', porcentaje: 94 },
             { zona: 'Ronda Este', nivel: 'normal', porcentaje: 38 },
             { zona: 'Sensor 4 (sin conexión)', nivel: 'desconectado', porcentaje: 0 }
         ]
@@ -208,7 +170,7 @@ const DATOS_ESTADISTICAS = {
         trafico: [
             { zona: 'Avenida Central', nivel: 'moderado', porcentaje: 72 },
             { zona: 'Calle Norte', nivel: 'normal', porcentaje: 40 },
-            { zona: 'Cruce costing', nivel: 'intenso', porcentaje: 90 },
+            { zona: 'Cruce Costanera', nivel: 'intenso', porcentaje: 90 },
             { zona: 'Ronda Este', nivel: 'moderado', porcentaje: 58 },
             { zona: 'Sensor 4 (sin conexión)', nivel: 'desconectado', porcentaje: 0 }
         ]
@@ -225,8 +187,11 @@ const TIPOS_TOAST = ['exito', 'advertencia', 'error', 'info'];
 /* ========================= 2. ESTADO CENTRAL ============================ */
 
 const estadoAplicacion = {
+    usuarioId: null,
     usuarioActual: null,
+    nombreActual: null,
     rolActual: null,
+    rolCodigo: null,
     seccionActual: 'dashboard',
     colorSemaforo: 'rojo',
     distancia: DISTANCIA_INICIAL,
@@ -297,7 +262,7 @@ function iniciales(nombre) {
 
 /* ============================ 4. SESIÓN ================================= */
 
-/* Inicia sesión con las credenciales simuladas. */
+/* Inicia sesión contra el backend: el servidor decide si las credenciales valen. */
 function iniciarSesion() {
     const campoUsuario = porId('campo-usuario');
     const campoClave = porId('campo-contrasena');
@@ -305,11 +270,10 @@ function iniciarSesion() {
     const boton = porId('boton-login');
 
     const usuario = campoUsuario ? campoUsuario.value.trim() : '';
-    const clave = campoClave ? campoClave.value.trim() : '';
+    const clave = campoClave ? campoClave.value : '';
 
     if (mensaje) { mensaje.textContent = ''; }
 
-    /* Validación 1: campos vacíos */
     if (usuario === '' || clave === '') {
         if (mensaje) { mensaje.textContent = 'Completa todos los campos.'; }
         mostrarNotificacion('Completa todos los campos.', 'error');
@@ -317,78 +281,73 @@ function iniciarSesion() {
         return;
     }
 
-    /* Validación 2: credenciales incorrectas */
-    const credencial = CREDENCIALES_SIMULADAS[usuario.toLowerCase()];
-    if (!credencial || credencial.clave !== clave) {
-        if (mensaje) { mensaje.textContent = 'Usuario o contraseña incorrectos.'; }
-        mostrarNotificacion('Usuario o contraseña incorrectos.', 'error');
-        if (campoClave) { campoClave.select(); }
-        return;
-    }
-
-    /* Animación breve de carga */
     if (boton) {
         boton.classList.add('cargando');
         boton.disabled = true;
     }
 
-    window.setTimeout(function () {
-        /* Guardamos la sesión. NUNCA se guarda la contraseña. */
-        estadoAplicacion.usuarioActual = usuario.toLowerCase();
-        estadoAplicacion.rolActual = credencial.rol;
-        auxiliar.ultimaLectura = horaActual();
+    fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario: usuario, clave: clave })
+    }).then(function (respuesta) {
+        return respuesta.json().catch(function () { return {}; }).then(function (cuerpo) {
+            if (!respuesta.ok) {
+                throw new Error(cuerpo.mensaje || 'No se pudo iniciar sesión.');
+            }
+            return cuerpo;
+        });
+    }).then(function (sesion) {
+        if (campoClave) { campoClave.value = ''; }
+        if (mensaje) { mensaje.textContent = ''; }
 
-        guardarSesionEnNavegador(usuario.toLowerCase(), credencial.rol, credencial.nombre);
-
+        aplicarSesion(sesion);
+        mostrarPantallaAplicacion();
+        mostrarNotificacion('Sesión iniciada correctamente.', 'exito');
+    }).catch(function (error) {
+        if (mensaje) { mensaje.textContent = error.message; }
+        mostrarNotificacion(error.message, 'error');
+        if (campoClave) { campoClave.select(); }
+    }).finally(function () {
         if (boton) {
             boton.classList.remove('cargando');
             boton.disabled = false;
         }
-        if (campoClave) { campoClave.value = ''; }
-        if (mensaje) { mensaje.textContent = ''; }
-
-        mostrarPantallaAplicacion();
-        mostrarNotificacion('Sesión iniciada correctamente.', 'exito');
-    }, 700);
+    });
 }
 
-/* Guarda la sesión simulada en localStorage (sin contraseña). */
-function guardarSesionEnNavegador(usuario, rol, nombre) {
-    try {
-        localStorage.setItem(CLAVE_SESION, JSON.stringify({
-            usuario: usuario,
-            rol: rol,
-            nombre: nombre,
-            activa: true
-        }));
-    } catch (error) {
-        /* localStorage puede estar bloqueado: la sesión sigue solo en memoria. */
-    }
-}
-
-/* Comprueba si hay una sesión activa al cargar la página. */
-function verificarSesion() {
-    let sesion = null;
-    try {
-        const guardado = localStorage.getItem(CLAVE_SESION);
-        sesion = guardado ? JSON.parse(guardado) : null;
-    } catch (error) {
-        sesion = null;
-    }
-
-    if (!sesion || !sesion.activa || !CREDENCIALES_SIMULADAS[sesion.usuario]) {
-        mostrarPantallaLogin();
-        return;
-    }
-
-    /* El rol SIEMPRE se recalcula a partir de la credencial simulada:
-       nunca se confía en el valor guardado en el navegador. */
-    const credencial = CREDENCIALES_SIMULADAS[sesion.usuario];
+/* Guarda en memoria la sesión que devuelve el servidor y avisa a conexion.js. */
+function aplicarSesion(sesion) {
+    estadoAplicacion.usuarioId = sesion.id;
     estadoAplicacion.usuarioActual = sesion.usuario;
-    estadoAplicacion.rolActual = credencial.rol;
+    estadoAplicacion.nombreActual = sesion.nombre;
+    estadoAplicacion.rolActual = sesion.rol;
+    estadoAplicacion.rolCodigo = sesion.rolCodigo;
     auxiliar.ultimaLectura = horaActual();
-    mostrarPantallaAplicacion();
-    mostrarNotificacion('Sesión restaurada correctamente.', 'info');
+
+    document.dispatchEvent(new CustomEvent('semaforoplus:sesion-iniciada', { detail: sesion }));
+}
+
+/* Pregunta al servidor si la cookie de sesión sigue siendo válida. */
+function verificarSesion() {
+    fetch('/api/auth/yo', { cache: 'no-store' })
+        .then(function (respuesta) {
+            /* 204 = no hay sesión abierta. */
+            if (respuesta.status === 204) { return null; }
+            if (!respuesta.ok) { throw new Error('sin sesión'); }
+            return respuesta.json();
+        })
+        .then(function (sesion) {
+            if (!sesion) {
+                mostrarPantallaLogin();
+                return;
+            }
+            aplicarSesion(sesion);
+            mostrarPantallaAplicacion();
+        })
+        .catch(function () {
+            mostrarPantallaLogin();
+        });
 }
 
 function mostrarPantallaLogin() {
@@ -404,8 +363,22 @@ function mostrarPantallaAplicacion() {
     if (login) { login.setAttribute('hidden', ''); }
     if (app) { app.removeAttribute('hidden'); }
 
-    const credencial = CREDENCIALES_SIMULADAS[estadoAplicacion.usuarioActual] || {};
-    const nombre = credencial.nombre || 'Usuario';
+    actualizarBarraUsuario();
+
+    aplicarPermisos();
+    if (esSuperadministrador()) { cargarUsuarios(); }
+    cargarConfiguracion();
+    renderizarEstadisticas('hoy');
+    actualizarDashboard();
+    const nombre = estadoAplicacion.nombreActual || 'Usuario';
+    agregarActividad('Sistema iniciado. Sesión de ' + nombre + '.');
+    cambiarSeccion('dashboard');
+    actualizarHora();
+}
+
+/* Pinta el nombre, el rol y las iniciales de la persona conectada. */
+function actualizarBarraUsuario() {
+    const nombre = estadoAplicacion.nombreActual || 'Usuario';
     const rol = estadoAplicacion.rolActual || '';
 
     setTexto('nombre-usuario-menu', nombre);
@@ -414,24 +387,13 @@ function mostrarPantallaAplicacion() {
     setTexto('rol-usuario-barra', rol);
     setTexto('avatar-menu', iniciales(nombre));
     setTexto('avatar-barra', iniciales(nombre));
-
-    aplicarPermisos();
-    cargarUsuarios();
-    cargarConfiguracion();
-    renderizarEstadisticas('hoy');
-    actualizarDashboard();
-    agregarActividad('Sistema iniciado. Sesión de ' + nombre + '.');
-    cambiarSeccion('dashboard');
-    actualizarHora();
 }
 
-/* Cierra la sesión simulada y vuelve al login. */
+/* Cierra la sesión en el servidor y vuelve al login. */
 function cerrarSesion() {
-    try {
-        localStorage.removeItem(CLAVE_SESION);
-    } catch (error) {
-        /* sin almacenamiento: se limpia solo el estado en memoria */
-    }
+    fetch('/api/auth/logout', { method: 'POST' }).catch(function () {
+        /* Si el servidor no responde, igual se limpia la interfaz. */
+    });
 
     detenerAnimacionDistancia();
     if (auxiliar.temporizadorAmarillo) {
@@ -439,8 +401,11 @@ function cerrarSesion() {
         auxiliar.temporizadorAmarillo = null;
     }
 
+    estadoAplicacion.usuarioId = null;
     estadoAplicacion.usuarioActual = null;
+    estadoAplicacion.nombreActual = null;
     estadoAplicacion.rolActual = null;
+    estadoAplicacion.rolCodigo = null;
     estadoAplicacion.seccionActual = 'dashboard';
     estadoAplicacion.colorSemaforo = 'rojo';
     estadoAplicacion.distancia = DISTANCIA_INICIAL;
@@ -465,6 +430,8 @@ function cerrarSesion() {
     if (campoUsuario) { campoUsuario.value = ''; }
     if (campoClave) { campoClave.value = ''; }
     setTexto('mensaje-login', 'Sesión cerrada correctamente.');
+
+    document.dispatchEvent(new CustomEvent('semaforoplus:sesion-cerrada'));
 
     mostrarPantallaLogin();
     mostrarNotificacion('Sesión cerrada correctamente.', 'info');
@@ -523,6 +490,8 @@ function cambiarSeccion(seccion) {
     }
 
     estadoAplicacion.seccionActual = seccion;
+
+    if (seccion === 'usuarios') { cargarUsuarios(); }
 
     $$('.seccion').forEach(function (panel) {
         const activo = panel.id === 'seccion-' + seccion;
@@ -825,8 +794,8 @@ function restablecerSimulacion() {
     setTexto('info-modo-ayuda', 'El sistema controla el semáforo automáticamente.');
     actualizarControlesModo();
     actualizarSemaforo();
-    agregarActividad('Simulación restablecida a valores iniciales.');
-    mostrarNotificacion('Simulación restablecida.', 'info');
+    agregarActividad('Sensor restablecido a valores iniciales.');
+    mostrarNotificacion('Sensor restablecido.', 'info');
 }
 
 /* ============= 7. DASHBOARD, MAPA Y CÁMARA SIMULADOS =================== */
@@ -849,7 +818,7 @@ function actualizarDashboard() {
 
     setTexto('estado-general', 'Operativo');
     setTexto('estado-dispositivo', 'Semáforo Principal');
-    setTexto('estado-conexion', 'Simulación activa');
+    setTexto('estado-conexion', 'En línea');
     setTexto('estado-actualizacion', auxiliar.ultimaLectura || horaActual());
     setTexto('estado-modo', estadoAplicacion.modo === 'automatico' ? 'Automático' : 'Manual');
 
@@ -931,8 +900,8 @@ function alternarSonido() {
         boton.textContent = auxiliar.sonidoCamara ? 'Desactivar sonido' : 'Activar sonido';
     }
     setTexto('estado-sonido', auxiliar.sonidoCamara
-        ? 'Sonido activado (simulación: se emite un pitido corto al capturar).'
-        : 'Sonido desactivado (simulación, no se reproduce audio real).');
+        ? 'Sonido activado: se emite un aviso al capturar.'
+        : 'Sonido desactivado.');
 
     mostrarNotificacion(auxiliar.sonidoCamara ? 'Sonido de cámara activado.' : 'Sonido de cámara desactivado.', 'info');
 }
@@ -970,7 +939,7 @@ function renderizarEstadisticas(periodo) {
         : datos.vehiculoTotal;
 
     setTexto('stat-vehiculos', String(total));
-    setTexto('stat-vehiculos-pie', 'Datos simulados · ' + datos.etiqueta.toLowerCase());
+    setTexto('stat-vehiculos-pie', 'Historial del periodo · ' + datos.etiqueta.toLowerCase());
     setTexto('stat-espera', datos.espera);
     setTexto('stat-cambios', String(auxiliar.cambiosColor + datos.cambios));
     setTexto('stat-hora-pico', datos.horaPico);
@@ -1030,19 +999,28 @@ function renderizarTrafico(lista) {
 
 /* ====================== 9. GESTIÓN DE USUARIOS ========================== */
 
-/* Carga la lista inicial de usuarios (solo en memoria). */
+/* Carga los usuarios desde el backend (solo el superadministrador puede). */
 function cargarUsuarios() {
-    estadoAplicacion.usuarios = USUARIOS_INICIALES.map(function (usuario) {
-        return {
-            id: usuario.id,
-            nombre: usuario.nombre,
-            usuario: usuario.usuario,
-            rol: usuario.rol,
-            estado: usuario.estado,
-            ultimoAcceso: usuario.ultimoAcceso
-        };
-    });
-    renderizarUsuarios();
+    if (!esSuperadministrador()) {
+        estadoAplicacion.usuarios = [];
+        renderizarUsuarios();
+        return;
+    }
+
+    fetch('/api/usuarios', { cache: 'no-store' })
+        .then(function (respuesta) {
+            if (!respuesta.ok) { throw new Error('No se pudo cargar la lista de usuarios.'); }
+            return respuesta.json();
+        })
+        .then(function (usuarios) {
+            estadoAplicacion.usuarios = usuarios;
+            renderizarUsuarios();
+        })
+        .catch(function (error) {
+            estadoAplicacion.usuarios = [];
+            renderizarUsuarios();
+            mostrarNotificacion(error.message, 'advertencia');
+        });
 }
 
 function renderizarUsuarios() {
@@ -1085,6 +1063,8 @@ function abrirModalUsuario(usuario) {
     const modal = porId('modal-usuario');
     if (!modal) { return; }
 
+    const campoClave = porId('usuario-clave');
+
     if (usuario) {
         setTexto('modal-usuario-titulo', 'Editar usuario');
         porId('usuario-id').value = usuario.id;
@@ -1092,6 +1072,11 @@ function abrirModalUsuario(usuario) {
         porId('usuario-username').value = usuario.usuario;
         porId('usuario-rol').value = usuario.rol;
         porId('usuario-estado').value = usuario.estado;
+
+        if (campoClave) {
+            campoClave.value = '';
+            campoClave.placeholder = 'Dejar vacío para conservar la actual';
+        }
     } else {
         setTexto('modal-usuario-titulo', 'Nuevo usuario');
         porId('usuario-id').value = '';
@@ -1099,6 +1084,11 @@ function abrirModalUsuario(usuario) {
         porId('usuario-username').value = '';
         porId('usuario-rol').value = 'Administrador';
         porId('usuario-estado').value = 'Activo';
+
+        if (campoClave) {
+            campoClave.value = '';
+            campoClave.placeholder = 'Mínimo 6 caracteres';
+        }
     }
 
     setTexto('modal-error', '');
@@ -1112,16 +1102,17 @@ function cerrarModalUsuario() {
     if (modal) { modal.setAttribute('hidden', ''); }
 }
 
-/* Valida los datos del formulario de usuario. */
+/* Valida los datos del formulario antes de enviarlos al servidor. */
 function validarUsuario(datos) {
     if (!datos.nombre) { return 'Completa el nombre del usuario.'; }
     if (!datos.usuario) { return 'Completa el nombre de acceso.'; }
-    if (!/^[a-zA-Z0-9._-]{3,}$/.test(datos.usuario)) {
-        return 'El nombre de acceso debe tener al menos 3 caracteres (letras, números, . _ -).';
+    if (!/^[a-zA-Z0-9._-]{3,40}$/.test(datos.usuario)) {
+        return 'El nombre de acceso debe tener entre 3 y 40 caracteres (letras, números, . _ -).';
     }
 
     const repetido = estadoAplicacion.usuarios.some(function (usuario) {
-        return usuario.usuario.toLowerCase() === datos.usuario.toLowerCase() && usuario.id !== datos.id;
+        return usuario.usuario.toLowerCase() === datos.usuario.toLowerCase() &&
+            String(usuario.id) !== String(datos.id);
     });
     if (repetido) { return 'Ese nombre de acceso ya está en uso.'; }
 
@@ -1131,10 +1122,41 @@ function validarUsuario(datos) {
     if (datos.estado !== 'Activo' && datos.estado !== 'Inactivo') {
         return 'Selecciona un estado válido.';
     }
+
+    if (datos.clave) {
+        if (datos.clave.length < 6) { return 'La contraseña debe tener al menos 6 caracteres.'; }
+        if (datos.clave.length > 60) { return 'La contraseña no puede superar los 60 caracteres.'; }
+    } else if (!datos.id) {
+        return 'Escribe una contraseña de al menos 6 caracteres.';
+    }
+
     return '';
 }
 
-/* Crea un usuario nuevo. */
+/* Envía el formulario a la API y devuelve el usuario guardado. */
+function enviarUsuario(metodo, url, datos) {
+    return fetch(url, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            nombre: datos.nombre,
+            usuario: datos.usuario,
+            clave: datos.clave,
+            rol: datos.rol,
+            activo: datos.estado === 'Activo'
+        })
+    }).then(function (respuesta) {
+        return respuesta.json().catch(function () { return {}; }).then(function (cuerpo) {
+            if (!respuesta.ok) {
+                if (respuesta.status === 401) { mostrarPantallaLogin(); }
+                throw new Error(cuerpo.mensaje || 'No se pudo guardar el usuario.');
+            }
+            return cuerpo;
+        });
+    });
+}
+
+/* Crea un usuario nuevo en el backend. */
 function crearUsuario() {
     const datos = leerFormularioUsuario();
     const error = validarUsuario(datos);
@@ -1144,24 +1166,25 @@ function crearUsuario() {
         return;
     }
 
-    estadoAplicacion.usuarios.push({
-        id: 'u' + Date.now(),
-        nombre: datos.nombre,
-        usuario: datos.usuario,
-        rol: datos.rol,
-        estado: datos.estado,
-        ultimoAcceso: 'Nunca'
-    });
-
-    renderizarUsuarios();
-    cerrarModalUsuario();
-    agregarActividad('Usuario creado: ' + datos.nombre + ' (' + datos.rol + ').');
-    mostrarNotificacion('Usuario creado correctamente.', 'exito');
+    enviarUsuario('POST', '/api/usuarios', datos)
+        .then(function (usuario) {
+            estadoAplicacion.usuarios.push(usuario);
+            renderizarUsuarios();
+            cerrarModalUsuario();
+            agregarActividad('Usuario creado: ' + usuario.nombre + ' (' + usuario.rol + ').');
+            mostrarNotificacion('Usuario creado correctamente.', 'exito');
+        })
+        .catch(function (fallo) {
+            setTexto('modal-error', fallo.message);
+            mostrarNotificacion(fallo.message, 'error');
+        });
 }
 
-/* Actualiza un usuario existente. */
+/* Actualiza un usuario existente en el backend. */
 function editarUsuario(id) {
-    const usuario = estadoAplicacion.usuarios.find(function (item) { return item.id === id; });
+    const usuario = estadoAplicacion.usuarios.find(function (item) {
+        return String(item.id) === String(id);
+    });
     if (!usuario) {
         mostrarNotificacion('Usuario no encontrado.', 'error');
         return;
@@ -1177,29 +1200,44 @@ function editarUsuario(id) {
         return;
     }
 
-    usuario.nombre = datos.nombre;
-    usuario.usuario = datos.usuario;
-    usuario.rol = datos.rol;
-    usuario.estado = datos.estado;
+    enviarUsuario('PUT', '/api/usuarios/' + encodeURIComponent(id), datos)
+        .then(function (actualizado) {
+            const indice = estadoAplicacion.usuarios.findIndex(function (item) {
+                return String(item.id) === String(actualizado.id);
+            });
+            if (indice >= 0) { estadoAplicacion.usuarios[indice] = actualizado; }
 
-    renderizarUsuarios();
-    cerrarModalUsuario();
-    agregarActividad('Usuario actualizado: ' + datos.nombre + '.');
-    mostrarNotificacion('Usuario actualizado correctamente.', 'exito');
+            /* Si la persona editó su propia cuenta, se refresca la barra. */
+            if (String(actualizado.id) === String(estadoAplicacion.usuarioId)) {
+                estadoAplicacion.nombreActual = actualizado.nombre;
+                estadoAplicacion.usuarioActual = actualizado.usuario;
+                estadoAplicacion.rolActual = actualizado.rol;
+                estadoAplicacion.rolCodigo = actualizado.rolCodigo;
+                actualizarBarraUsuario();
+                aplicarPermisos();
+                if (!seccionPermitida(estadoAplicacion.seccionActual)) {
+                    cambiarSeccion('dashboard');
+                }
+            }
+
+            renderizarUsuarios();
+            cerrarModalUsuario();
+            agregarActividad('Usuario actualizado: ' + actualizado.nombre + '.');
+            mostrarNotificacion('Usuario actualizado correctamente.', 'exito');
+        })
+        .catch(function (fallo) {
+            setTexto('modal-error', fallo.message);
+            mostrarNotificacion(fallo.message, 'error');
+        });
 }
 
-/* Elimina un usuario (el superadmin principal está protegido). */
+/* Elimina un usuario. El backend impide quedarse sin superadministrador. */
 function eliminarUsuario(id) {
-    const indice = estadoAplicacion.usuarios.findIndex(function (item) { return item.id === id; });
-    if (indice === -1) {
+    const usuario = estadoAplicacion.usuarios.find(function (item) {
+        return String(item.id) === String(id);
+    });
+    if (!usuario) {
         mostrarNotificacion('Usuario no encontrado.', 'error');
-        return;
-    }
-
-    const usuario = estadoAplicacion.usuarios[indice];
-
-    if (usuario.usuario === 'superadmin') {
-        mostrarNotificacion('El superadministrador principal no puede eliminarse.', 'error');
         return;
     }
 
@@ -1207,10 +1245,31 @@ function eliminarUsuario(id) {
         return;
     }
 
-    estadoAplicacion.usuarios.splice(indice, 1);
-    renderizarUsuarios();
-    agregarActividad('Usuario eliminado: ' + usuario.nombre + '.');
-    mostrarNotificacion('Usuario eliminado correctamente.', 'exito');
+    fetch('/api/usuarios/' + encodeURIComponent(id), { method: 'DELETE' })
+        .then(function (respuesta) {
+            return respuesta.json().catch(function () { return {}; }).then(function (cuerpo) {
+                if (!respuesta.ok) {
+                    throw new Error(cuerpo.mensaje || 'No se pudo eliminar el usuario.');
+                }
+                return cuerpo;
+            });
+        })
+        .then(function () {
+            estadoAplicacion.usuarios = estadoAplicacion.usuarios.filter(function (item) {
+                return String(item.id) !== String(id);
+            });
+            renderizarUsuarios();
+            agregarActividad('Usuario eliminado: ' + usuario.nombre + '.');
+            mostrarNotificacion('Usuario eliminado correctamente.', 'exito');
+
+            if (String(id) === String(estadoAplicacion.usuarioId)) {
+                mostrarNotificacion('Tu cuenta fue eliminada. Vuelve a iniciar sesión.', 'advertencia');
+                cerrarSesion();
+            }
+        })
+        .catch(function (fallo) {
+            mostrarNotificacion(fallo.message, 'error');
+        });
 }
 
 function leerFormularioUsuario() {
@@ -1218,10 +1277,12 @@ function leerFormularioUsuario() {
         const elemento = porId(id);
         return elemento ? elemento.value.trim() : '';
     };
+    const campoClave = porId('usuario-clave');
     return {
         id: campo('usuario-id'),
         nombre: campo('usuario-nombre'),
         usuario: campo('usuario-username'),
+        clave: campoClave ? campoClave.value : '',
         rol: campo('usuario-rol'),
         estado: campo('usuario-estado')
     };
@@ -1266,14 +1327,14 @@ function poblarFormularioConfiguracion() {
     actualizarVistaPreviaCamara();
     setTexto('camara-nombre', config.camaraNombre);
     estadoAplicacion.camaraConectada = config.camaraEstado === 'activada';
-    setTexto('camara-estado', estadoAplicacion.camaraConectada ? 'Conectada — Simulación' : 'Desactivada — Simulación');
+    setTexto('camara-estado', estadoAplicacion.camaraConectada ? 'Activa' : 'Desactivada');
 }
 
 function actualizarVistaPreviaCamara() {
     const campo = porId('config-camara-calidad');
     const calidad = campo ? campo.value : '1080p';
     const medidas = { '1080p': '1920×1080', '720p': '1280×720', '480p': '854×480' };
-    setTexto('vista-previa-config', calidad + ' · ' + (medidas[calidad] || '—') + ' (simulado)');
+    setTexto('vista-previa-config', calidad + ' · ' + (medidas[calidad] || '—'));
 }
 
 function guardarConfiguracion() {
@@ -1655,7 +1716,9 @@ function registrarEventos() {
             const accion = boton.getAttribute('data-accion');
 
             if (accion === 'editar') {
-                const usuario = estadoAplicacion.usuarios.find(function (item) { return item.id === id; });
+                const usuario = estadoAplicacion.usuarios.find(function (item) {
+                    return String(item.id) === String(id);
+                });
                 if (usuario) { abrirModalUsuario(usuario); }
             } else if (accion === 'eliminar') {
                 eliminarUsuario(id);
