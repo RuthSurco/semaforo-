@@ -1774,3 +1774,57 @@ if (document.readyState === 'loading') {
 } else {
     iniciar();
 }
+/* ==========================================================================
+   ESP32-CAM: Streaming MJPEG continuo en tiempo real (Alto rendimiento)
+   ========================================================================== */
+(function() {
+    var iniciado = false;
+
+    function conectarStream() {
+        var img = document.getElementById('video-camara-real');
+        var simu = document.getElementById('camara-simu');
+        var estado = document.getElementById('camara-estado');
+
+        fetch('/api/camara/estado')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.conectada) {
+                    if (img) {
+                        img.style.display = 'block';
+                        if (!iniciado) {
+                            // Conectar al stream MJPEG continuo sin recargas periódicas
+                            img.src = '/api/camara/stream';
+                            iniciado = true;
+                        }
+                    }
+                    if (simu) {
+                        simu.textContent = 'REAL · ESP32';
+                        simu.className = 'insignia insignia-exito';
+                    }
+                    if (estado) {
+                        estado.textContent = 'En vivo (' + Math.round(d.tamanoUltimoFrame / 1024) + ' KB)';
+                        estado.className = 'insignia insignia-exito';
+                    }
+                } else {
+                    if (img && iniciado) {
+                        img.style.display = 'none';
+                        img.src = '';
+                        iniciado = false;
+                    }
+                    if (simu) {
+                        simu.textContent = 'SIMULACIÓN';
+                        simu.className = 'insignia insignia-error';
+                    }
+                    if (estado) {
+                        estado.textContent = 'Esperando señal ESP32-CAM...';
+                        estado.className = 'insignia insignia-info';
+                    }
+                }
+            })
+            .catch(function() {});
+    }
+
+    // Verificar estado cada 2 segundos, pero el video se mantiene abierto y fluido por MJPEG
+    window.setInterval(conectarStream, 2000);
+    conectarStream();
+})();

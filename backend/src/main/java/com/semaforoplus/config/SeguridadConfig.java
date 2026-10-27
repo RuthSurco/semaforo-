@@ -81,6 +81,7 @@ public class SeguridadConfig {
                         /* El dispositivo y la página de salud no necesitan sesión. */
                         .requestMatchers(HttpMethod.GET, "/api/salud").permitAll()
                         .requestMatchers("/api/telemetria", "/api/lecturas").permitAll()
+                        .requestMatchers("/api/camara/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/control/pendiente").permitAll()
 
                         /* Consola de base de datos (solo para desarrollo local). */
